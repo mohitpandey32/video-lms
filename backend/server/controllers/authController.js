@@ -69,7 +69,11 @@ export async function login(req, res, next) {
 
 export function logout(req, res) {
   req.session.destroy(() => {
-    res.clearCookie('arcwell.sid')
+    res.clearCookie('arcwell.sid', {
+      httpOnly: true,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    })
     res.status(204).end()
   })
 }

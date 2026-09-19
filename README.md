@@ -1,88 +1,101 @@
 # Arcwell LMS
 
-A polished, full-stack lecture workspace built with React, Express, Node.js, and MongoDB. It supports public Google Drive lecture URLs, direct video links, class-note PDFs, assignment PDFs, personal progress, and assignment submissions.
-
-## Backend architecture
-
-The Express API follows MVC with a small service layer:
+Arcwell is split into two independently deployable applications:
 
 ```text
-server/
-├── config/       MongoDB connection and indexes
-├── models/       Course, user, and progress data access
-├── controllers/  Authentication, student, and admin request logic
-├── routes/       API route definitions
-├── middleware/   Authentication, authorization, and error handling
-├── services/     Course-progress business logic
-├── utils/        URL validation and Google Drive helpers
-├── app.js        Express middleware and route composition
-└── index.js      Database initialization and server startup
+frontend/  React + Vite static site
+backend/   Express API + MongoDB sessions and data
 ```
 
-## Authentication and roles
+The frontend calls the backend through `VITE_API_URL`. The backend permits the frontend origin through `CLIENT_ORIGIN`. Authentication uses an HTTP-only session cookie, so frontend requests include credentials.
 
-- Login and student signup use MongoDB-backed server-side sessions with HTTP-only cookies.
-- Passwords are hashed with bcrypt before storage.
-- New signups always receive the `student` role.
-- The requested administrator account is seeded for `pandeymohit998@gmail.com`; its password is stored only as a bcrypt hash.
-- Students can view lectures, take notes, and submit assignments. Lecture and module management endpoints return `403` for student accounts.
-- Administrators open into a separate course-management console and can switch to a student preview.
+## Local development
 
-Set `MONGODB_URI`, `MONGODB_DB`, a strong `SESSION_SECRET`, and the deployed `CLIENT_ORIGIN` in the production environment. See `.env.example` for the complete list. Never commit `.env`.
-
-Use **New lecture** in the top bar to add a titled video lesson to any course module. New lectures are persisted by the Express API, appear in the course outline, and open immediately after publishing.
-
-To rename a module, open the course outline and use the pencil action beside its heading. Module edits are saved without changing the lectures inside it.
-
-Each lecture has its own pencil action as well. Renaming a lecture updates both the course outline and the active player heading while preserving its video link and progress.
-
-Administrators can open **Resources** beside any lecture to add or replace its public video URL, class-notes PDF URL, and assignment PDF URL. The same fields are available while creating a lecture. Published PDFs appear as lesson-resource links in the student player; all links must use HTTP or HTTPS and Drive files must allow public viewer access.
-
-Students can switch lessons by clicking any lecture in the course outline. The active row, module label, lesson number, video, and PDF resources update together. Lectures without a published video open an intentional resources-only state instead of failing.
-
-Course progress is calculated per user and persisted in MongoDB. Students can mark or unmark the current lecture, while direct video links complete automatically when playback ends. The percentage, completed count, progress bar, and lesson checkmarks update together; Google Drive videos use the manual completion control because embedded Drive playback does not expose completion events.
-
-## MongoDB setup
-
-Copy `.env.example` to `.env` and add your Atlas connection string. The LMS uses isolated collections so it does not conflict with other data in the same database:
-
-- `lms_courses` for course modules, lectures, links, and assignments
-- `lms_users` for accounts and roles
-- `lms_progress` for per-student completion
-- `lms_sessions` for persistent login sessions
-
-To import the included JSON seed data once, run:
-
-```bash
-npm run migrate:mongo
-```
-
-The migration imports the existing course, modules, lectures, users, admin roles, and progress. Do not rerun it after editing live course data unless you intentionally want the bundled seed snapshot to replace matching records.
-
-## Run locally
+Install each application:
 
 ```bash
 npm install
+npm run install:all
+```
+
+Create the backend environment file:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Optionally create `frontend/.env` from `frontend/.env.example`. Without it, local development defaults to `http://localhost:4000`.
+
+Import the included seed data once:
+
+```bash
 npm run migrate:mongo
+```
+
+Start both applications:
+
+```bash
 npm run dev
 ```
 
-Open `http://localhost:5173`. The API runs on `http://localhost:4000`.
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:4000`
+- Health check: `http://localhost:4000/api/health`
 
-## Use a Google Drive video
+## Sevalla deployment
 
-1. Upload the video to Google Drive.
-2. Open **Share** and change **General access** to **Anyone with the link**.
-3. Copy the link.
-4. In Arcwell, choose **Change video**, paste the URL, and save.
+### Backend — Application Hosting
 
-Drive videos use Google's embedded preview player. Direct `.mp4` and `.webm` links use Arcwell's custom player.
+Create a Sevalla Application with:
 
-## Production
-
-```bash
-npm run build
-npm start
+```text
+Build path: /backend
+Start command: npm start
 ```
 
-The Express server serves the built React app on `http://localhost:4000` in production. Set all variables from `.env.example` in your hosting provider; local `.env` files are not uploaded automatically by most providers.
+Set these runtime environment variables:
+
+```env
+NODE_ENV=production
+MONGODB_URI=mongodb+srv://...
+MONGODB_DB=corebase
+SESSION_SECRET=replace-with-a-long-random-secret
+CLIENT_ORIGIN=https://video-lms-bkyz7.sevalla.app
+```
+
+Sevalla provides `PORT`; do not set it manually. After the backend is deployed, verify:
+
+```text
+https://YOUR-BACKEND-DOMAIN/api/health
+```
+
+The response should be `{"status":"ok"}`. Run `npm run migrate:mongo` once from the backend web terminal to import the bundled course and users.
+
+### Frontend — Static Site Hosting
+
+Keep the existing static frontend and configure:
+
+```text
+Build path: /frontend
+Build command: npm run build
+Publish directory: dist
+```
+
+Set this build-time environment variable to the backend Application URL:
+
+```env
+VITE_API_URL=https://YOUR-BACKEND-DOMAIN
+```
+
+Do not include a trailing slash or `/api`. Redeploy the frontend whenever `VITE_API_URL` changes.
+
+## Data storage
+
+Runtime data is stored in MongoDB collections:
+
+- `lms_courses`
+- `lms_users`
+- `lms_progress`
+- `lms_sessions`
+
+The JSON files under `backend/server/` are migration seeds only. The running application does not read them directly.

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { api } from './api'
 import {
   ArrowLeft, BookOpen, Check, ChevronDown, ChevronRight, Circle,
   ClipboardList, ExternalLink, Eye, FileText, Gauge, GraduationCap, LayoutList,
@@ -7,108 +8,6 @@ import {
   Play, Plus, Settings2, ShieldCheck, SkipBack, SkipForward, Upload, UserRound,
   VideoOff, Volume2, VolumeX, X,
 } from 'lucide-react'
-
-const api = {
-  async me() {
-    const response = await fetch('/api/auth/me')
-    if (!response.ok) throw new Error('Authentication is unavailable.')
-    return response.json()
-  },
-  async login(payload) {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-    })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message)
-    return result
-  },
-  async signup(payload) {
-    const response = await fetch('/api/auth/signup', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-    })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message)
-    return result
-  },
-  async logout() {
-    const response = await fetch('/api/auth/logout', { method: 'POST' })
-    if (!response.ok) throw new Error('Could not sign out.')
-  },
-  async getCourse() {
-    const response = await fetch('/api/course')
-    if (!response.ok) throw new Error('Course data is unavailable.')
-    return response.json()
-  },
-  async saveNotes(notes) {
-    const response = await fetch('/api/notes', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes }),
-    })
-    if (!response.ok) throw new Error('Notes could not be saved.')
-    return response.json()
-  },
-  async updateLecture(payload) {
-    const response = await fetch('/api/lecture', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-    })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message)
-    return result
-  },
-  async createLecture(payload) {
-    const response = await fetch('/api/lectures', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-    })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message)
-    return result
-  },
-  async selectLecture(moduleIndex, lectureIndex) {
-    const response = await fetch(`/api/modules/${moduleIndex}/lectures/${lectureIndex}/select`, { method: 'PUT' })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message)
-    return result
-  },
-  async updateModule(index, title) {
-    const response = await fetch(`/api/modules/${index}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }),
-    })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message)
-    return result
-  },
-  async updateLectureName(moduleIndex, lectureIndex, title) {
-    const response = await fetch(`/api/modules/${moduleIndex}/lectures/${lectureIndex}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }),
-    })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message)
-    return result
-  },
-  async updateLectureResources(moduleIndex, lectureIndex, payload) {
-    const response = await fetch(`/api/modules/${moduleIndex}/lectures/${lectureIndex}/resources`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-    })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message)
-    return result
-  },
-  async updateProgress(moduleIndex, lectureIndex, completed) {
-    const response = await fetch(`/api/progress/${moduleIndex}/${lectureIndex}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ completed }),
-    })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message)
-    return result
-  },
-  async submitAssignment(id, responseText) {
-    const response = await fetch(`/api/assignments/${id}/submit`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ response: responseText }),
-    })
-    const result = await response.json()
-    if (!response.ok) throw new Error(result.message)
-    return result
-  },
-}
 
 function formatTime(value) {
   if (!Number.isFinite(value)) return '0:00'
@@ -618,8 +517,8 @@ export default function App() {
   }
 
   if (!authReady) return <main className="load-state"><div className="brand-mark pulse">A</div><span>Checking your session…</span></main>
-  if (!user) return <AuthScreen onAuthenticate={authenticate} />
   if (error) return <main className="load-state"><div className="brand-mark">A</div><h1>Arcwell is offline</h1><p>{error}</p><button className="primary-button" onClick={logout}>Log out</button></main>
+  if (!user) return <AuthScreen onAuthenticate={authenticate} />
   if (!data) return <main className="load-state"><div className="brand-mark pulse">A</div><span>Opening your course…</span></main>
 
   const canEdit = user.role === 'admin'
