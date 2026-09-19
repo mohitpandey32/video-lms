@@ -6,7 +6,7 @@ import {
   ClipboardList, ExternalLink, Eye, FileText, Gauge, GraduationCap, LayoutList,
   Link2, List, LockKeyhole, LogOut, Mail, Maximize, Menu, Pause, PencilLine,
   Play, Plus, Settings2, ShieldCheck, SkipBack, SkipForward, Upload, UserRound,
-  VideoOff, Volume2, VolumeX, X,
+  Trash2, VideoOff, Volume2, VolumeX, X,
 } from 'lucide-react'
 
 function formatTime(value) {
@@ -157,33 +157,12 @@ function LectureResources({ lecture }) {
   )
 }
 
-function Notes({ value, onChange, onSave, status, lectureUrl }) {
+function ResourceLinkPane({ url, label }) {
   return (
-    <motion.div className="notes-pane" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="pane-heading"><div><h3>Lecture notes</h3><p>Your notes are private and saved to this course.</p></div><span className={`save-status ${status === 'Saved' ? 'saved' : ''}`}>{status}</span></div>
-      <textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder="Capture an idea, timestamp, or question…" />
-      <div className="note-footer"><span>Markdown-friendly · {value.length.toLocaleString()} characters</span><div className="note-actions">{lectureUrl && <a className="primary-button" href={lectureUrl} target="_blank" rel="noreferrer">Open lecture <ExternalLink /></a>}<button className="primary-button" onClick={onSave}>Save notes</button></div></div>
-    </motion.div>
-  )
-}
-
-function Assignment({ item, onSubmit, canSubmit = false, assignmentUrl = '' }) {
-  const [response, setResponse] = useState(item.submission || '')
-  const [error, setError] = useState('')
-  const publishedUrl = item.submission || assignmentUrl
-  const submit = async () => { try { setError(''); await onSubmit(response) } catch (err) { setError(err.message) } }
-  return (
-    <motion.div className="assignment-pane" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="assignment-meta"><span className="status-dot">{publishedUrl ? 'Published' : 'Open'}</span><span>Due {item.due}</span></div>
-      <h3>{item.title}</h3><p>{item.description}</p>
-      {canSubmit ? <>
-        <label htmlFor="submission">Assignment link</label>
-        <textarea id="submission" value={response} onChange={(e) => setResponse(e.target.value)} placeholder="Paste a public Drive, PDF, or assignment URL…" />
-        {error && <span className="form-error">{error}</span>}
-        <div className="assignment-footer"><span>Make sure linked files allow viewer access.</span><button className="primary-button" onClick={submit}>{item.status === 'submitted' ? 'Update assignment link' : 'Publish assignment link'}</button></div>
-      </> : publishedUrl
-        ? <div className="assignment-footer"><span>Your instructor has published the assignment.</span><a className="primary-button" href={publishedUrl} target="_blank" rel="noreferrer">Open assignment <ExternalLink /></a></div>
-        : <div className="assignment-footer"><span>The course administrator has not published an assignment link yet.</span></div>}
+    <motion.div className="resource-action-pane" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+      {url
+        ? <a className="resource-open-button" href={url} target="_blank" rel="noreferrer">{label} <ExternalLink /></a>
+        : <button className="resource-open-button" disabled>{label}</button>}
     </motion.div>
   )
 }
@@ -343,6 +322,33 @@ function EditLectureModal({ lecture, onClose, onSave }) {
   )
 }
 
+function DeleteLectureModal({ lecture, onClose, onDelete }) {
+  const [error, setError] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const confirmDelete = async () => {
+    try {
+      setDeleting(true); setError('')
+      await onDelete(lecture.moduleIndex, lecture.lectureIndex)
+      onClose()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
+      <motion.div className="modal module-form" initial={{ scale: .96, y: 16 }} animate={{ scale: 1, y: 0 }} exit={{ scale: .96, y: 16 }} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-heading"><div><span className="modal-icon danger-icon"><Trash2 /></span><div><h2>Delete lecture?</h2><p>{lecture.title}</p></div></div><button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X /></button></div>
+        <p className="delete-warning">This removes the lecture, its video and resource links from the course. Student completion records for later lectures will be adjusted automatically.</p>
+        {error && <span className="form-error">{error}</span>}
+        <div className="modal-actions"><button type="button" className="text-button" onClick={onClose} disabled={deleting}>Cancel</button><button type="button" className="danger-button" onClick={confirmDelete} disabled={deleting}>{deleting ? 'Deleting…' : 'Delete lecture'}</button></div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 function AuthScreen({ onAuthenticate }) {
   const [mode, setMode] = useState('login')
   const [form, setForm] = useState({ name: '', email: '', password: '' })
@@ -389,7 +395,7 @@ function AuthScreen({ onAuthenticate }) {
   )
 }
 
-function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditModule, onEditLecture, onEditResources }) {
+function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditModule, onEditLecture, onEditResources, onDeleteLecture }) {
   const lessonCount = data.modules.reduce((total, module) => total + module.lessons.length, 0)
   const videoCount = data.modules.reduce((total, module) => total + module.lessons.filter((lesson) => lesson.videoUrl).length, 0)
   const pdfCount = data.modules.reduce((total, module) => total + module.lessons.filter((lesson) => lesson.classNotesUrl || lesson.assignmentPdfUrl).length, 0)
@@ -414,7 +420,7 @@ function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditM
                     <span className={`admin-lesson-state ${lesson.videoUrl ? 'published' : ''}`}>{lesson.videoUrl ? <Play fill="currentColor" /> : <Circle />}</span>
                     <div><b>{lesson.title}</b><span>{lesson.duration} · {lesson.videoUrl ? 'Video ready' : 'No video'} · {[lesson.classNotesUrl, lesson.assignmentPdfUrl].filter(Boolean).length} PDFs</span></div>
                     {lesson.active && <span className="current-chip">Currently open</span>}
-                    <div className="admin-lesson-actions"><button onClick={() => onEditResources(moduleIndex, lectureIndex, lesson)}><Link2 /> Resources</button><button onClick={() => onEditLecture(moduleIndex, lectureIndex, lesson.title)}><PencilLine /> Name</button></div>
+                    <div className="admin-lesson-actions"><button onClick={() => onEditResources(moduleIndex, lectureIndex, lesson)}><Link2 /> Resources</button><button onClick={() => onEditLecture(moduleIndex, lectureIndex, lesson.title)}><PencilLine /> Name</button><button className="delete-action" onClick={() => onDeleteLecture(moduleIndex, lectureIndex, lesson)}><Trash2 /> Delete</button></div>
                   </div>
                 ))}
               </div>
@@ -431,14 +437,13 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false)
   const [data, setData] = useState(null)
   const [activeTab, setActiveTab] = useState('notes')
-  const [notes, setNotes] = useState('')
-  const [noteStatus, setNoteStatus] = useState('All changes saved')
   const [railOpen, setRailOpen] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [newLectureOpen, setNewLectureOpen] = useState(false)
   const [editingModule, setEditingModule] = useState(null)
   const [editingLecture, setEditingLecture] = useState(null)
   const [editingResources, setEditingResources] = useState(null)
+  const [deletingLecture, setDeletingLecture] = useState(null)
   const [adminPreview, setAdminPreview] = useState(false)
   const [progressSaving, setProgressSaving] = useState(false)
   const [error, setError] = useState('')
@@ -450,7 +455,7 @@ export default function App() {
         setUser(auth.user)
         if (auth.user) {
           const course = await api.getCourse()
-          setData(course); setNotes(course.notes)
+          setData(course)
         }
       } catch (err) {
         setError(err.message)
@@ -464,7 +469,7 @@ export default function App() {
   const authenticate = async (mode, payload) => {
     const auth = mode === 'login' ? await api.login(payload) : await api.signup(payload)
     const course = await api.getCourse()
-    setUser(auth.user); setData(course); setNotes(course.notes); setError('')
+    setUser(auth.user); setData(course); setError('')
   }
 
   const logout = async () => {
@@ -480,7 +485,6 @@ export default function App() {
   const createLecture = async (payload) => {
     const updated = await api.createLecture(payload)
     setData(updated)
-    setNotes(updated.notes)
     setActiveTab('notes')
   }
 
@@ -510,15 +514,10 @@ export default function App() {
     setData(updated)
   }
 
-  const saveNotes = async () => {
-    setNoteStatus('Saving…')
-    try { await api.saveNotes(notes); setNoteStatus('Saved') }
-    catch { setNoteStatus('Save failed') }
-  }
-
-  const submitAssignment = async (response) => {
-    const updated = await api.submitAssignment(data.assignments[0].id, response)
-    setData((current) => ({ ...current, assignments: [updated] }))
+  const deleteLecture = async (moduleIndex, lectureIndex) => {
+    const updated = await api.deleteLecture(moduleIndex, lectureIndex)
+    setData(updated)
+    setActiveTab('notes')
   }
 
   if (!authReady) return <main className="load-state"><div className="brand-mark pulse">A</div><span>Checking your session…</span></main>
@@ -557,11 +556,12 @@ export default function App() {
   if (canEdit && !adminPreview) {
     return (
       <>
-        <AdminDashboard data={data} user={user} onPreview={() => setAdminPreview(true)} onLogout={logout} onNewLecture={() => setNewLectureOpen(true)} onEditModule={(index, title) => setEditingModule({ index, title })} onEditLecture={(moduleIndex, lectureIndex, title) => setEditingLecture({ moduleIndex, lectureIndex, title })} onEditResources={(moduleIndex, lectureIndex, lecture) => setEditingResources({ moduleIndex, lectureIndex, ...lecture })} />
+        <AdminDashboard data={data} user={user} onPreview={() => setAdminPreview(true)} onLogout={logout} onNewLecture={() => setNewLectureOpen(true)} onEditModule={(index, title) => setEditingModule({ index, title })} onEditLecture={(moduleIndex, lectureIndex, title) => setEditingLecture({ moduleIndex, lectureIndex, title })} onEditResources={(moduleIndex, lectureIndex, lecture) => setEditingResources({ moduleIndex, lectureIndex, ...lecture })} onDeleteLecture={(moduleIndex, lectureIndex, lecture) => setDeletingLecture({ moduleIndex, lectureIndex, title: lecture.title })} />
         <AnimatePresence>{newLectureOpen && <NewLectureModal modules={data.modules} onClose={() => setNewLectureOpen(false)} onCreate={createLecture} />}</AnimatePresence>
         <AnimatePresence>{editingModule && <EditModuleModal module={editingModule} onClose={() => setEditingModule(null)} onSave={updateModule} />}</AnimatePresence>
         <AnimatePresence>{editingLecture && <EditLectureModal lecture={editingLecture} onClose={() => setEditingLecture(null)} onSave={updateLectureName} />}</AnimatePresence>
         <AnimatePresence>{editingResources && <LectureResourcesModal lecture={editingResources} onClose={() => setEditingResources(null)} onSave={updateLectureResources} />}</AnimatePresence>
+        <AnimatePresence>{deletingLecture && <DeleteLectureModal lecture={deletingLecture} onClose={() => setDeletingLecture(null)} onDelete={deleteLecture} />}</AnimatePresence>
       </>
     )
   }
@@ -594,8 +594,8 @@ export default function App() {
             <button className={activeTab === 'outline' ? 'active' : ''} onClick={() => setActiveTab('outline')}><List /> Lesson details</button>
           </div>
           <AnimatePresence mode="wait">
-            {activeTab === 'notes' && <Notes key="notes" value={notes} onChange={(value) => { setNotes(value); setNoteStatus('Unsaved changes') }} onSave={saveNotes} status={noteStatus} lectureUrl={data.lecture.videoUrl} />}
-            {activeTab === 'assignment' && <Assignment key="assignment" item={data.assignments[0]} onSubmit={submitAssignment} canSubmit={canEdit} assignmentUrl={data.lecture.assignmentPdfUrl} />}
+            {activeTab === 'notes' && <ResourceLinkPane key="notes" url={data.lecture.classNotesUrl} label="Open notes" />}
+            {activeTab === 'assignment' && <ResourceLinkPane key="assignment" url={data.lecture.assignmentPdfUrl || data.assignments[0]?.submission} label="Open assignment" />}
             {activeTab === 'outline' && <motion.div key="outline" className="details-pane" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><div><span>In this lesson</span><h3>Turn raw conversations into evidence your team can use.</h3></div><ol><li><span>00:00</span>What counts as a signal</li><li><span>07:42</span>Separate behavior from opinion</li><li><span>18:10</span>Build the opportunity map</li></ol></motion.div>}
           </AnimatePresence>
         </section>

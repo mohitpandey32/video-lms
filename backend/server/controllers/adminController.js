@@ -1,6 +1,41 @@
 import { getCourse, saveCourse } from '../models/courseModel.js'
+import { reindexProgressAfterLectureDelete } from '../models/progressModel.js'
 import { applyUserProgress } from '../services/courseService.js'
 import { driveEmbedUrl, isValidWebUrl } from '../utils/url.js'
+
+function synchronizeActiveLecture(course) {
+  let selectedModuleIndex = -1
+  let selectedLectureIndex = -1
+
+  course.modules.some((module, moduleIndex) => {
+    const lectureIndex = module.lessons.findIndex((lesson) => lesson.active)
+    if (lectureIndex < 0) return false
+    selectedModuleIndex = moduleIndex
+    selectedLectureIndex = lectureIndex
+    return true
+  })
+
+  if (selectedModuleIndex < 0) {
+    selectedModuleIndex = course.modules.findIndex((module) => module.lessons.length)
+    selectedLectureIndex = 0
+  }
+
+  course.modules.forEach((module) => module.lessons.forEach((lesson) => { lesson.active = false }))
+  const module = course.modules[selectedModuleIndex]
+  const lecture = module.lessons[selectedLectureIndex]
+  lecture.active = true
+  const previousLessons = course.modules.slice(0, selectedModuleIndex)
+    .reduce((total, item) => total + item.lessons.length, 0)
+  course.lecture = {
+    ...lecture,
+    number: String(previousLessons + selectedLectureIndex + 1).padStart(2, '0'),
+    moduleTitle: module.title,
+    videoUrl: lecture.videoUrl || '',
+    embedUrl: lecture.embedUrl || '',
+    classNotesUrl: lecture.classNotesUrl || '',
+    assignmentPdfUrl: lecture.assignmentPdfUrl || '',
+  }
+}
 
 export async function updateModule(req, res) {
   const moduleIndex = Number(req.params.index)
@@ -45,6 +80,34 @@ export async function updateLecture(req, res) {
     res.json(await applyUserProgress(course, req.user.id))
   } catch {
     res.status(500).json({ message: 'Could not update the lecture.' })
+  }
+}
+
+export async function deleteLecture(req, res) {
+  const moduleIndex = Number(req.params.moduleIndex)
+  const lectureIndex = Number(req.params.lectureIndex)
+
+  try {
+    const course = await getCourse()
+    const module = course.modules[moduleIndex]
+    const lecture = module?.lessons?.[lectureIndex]
+    if (!Number.isInteger(moduleIndex) || !Number.isInteger(lectureIndex) || !lecture) {
+      return res.status(404).json({ message: 'Lecture not found.' })
+    }
+
+    const lectureCount = course.modules.reduce((total, item) => total + item.lessons.length, 0)
+    if (lectureCount <= 1) {
+      return res.status(400).json({ message: 'The course must contain at least one lecture.' })
+    }
+
+    module.lessons.splice(lectureIndex, 1)
+    synchronizeActiveLecture(course)
+    await saveCourse(course)
+    await reindexProgressAfterLectureDelete(moduleIndex, lectureIndex)
+    res.json(await applyUserProgress(course, req.user.id))
+  } catch (error) {
+    console.error('Could not delete lecture:', error)
+    res.status(500).json({ message: 'Could not delete the lecture.' })
   }
 }
 

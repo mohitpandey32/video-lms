@@ -47,7 +47,6 @@ export const api = {
   signup: (payload) => request('/api/auth/signup', { method: 'POST', body: json(payload) }),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
   getCourse: () => request('/api/course'),
-  saveNotes: (notes) => request('/api/notes', { method: 'PUT', body: json({ notes }) }),
   updateLecture: (payload) => request('/api/lecture', { method: 'PUT', body: json(payload) }),
   createLecture: (payload) => request('/api/lectures', { method: 'POST', body: json(payload) }),
   selectLecture: (moduleIndex, lectureIndex) => request(
@@ -66,12 +65,12 @@ export const api = {
     `/api/modules/${moduleIndex}/lectures/${lectureIndex}/resources`,
     { method: 'PUT', body: json(payload) },
   ),
+  deleteLecture: (moduleIndex, lectureIndex) => request(
+    `/api/modules/${moduleIndex}/lectures/${lectureIndex}`,
+    { method: 'DELETE' },
+  ),
   updateProgress: (moduleIndex, lectureIndex, completed) => request(
     `/api/progress/${moduleIndex}/${lectureIndex}`,
     { method: 'PUT', body: json({ completed }) },
   ),
-  submitAssignment: (id, response) => request(`/api/assignments/${id}/submit`, {
-    method: 'POST',
-    body: json({ response }),
-  }),
 }

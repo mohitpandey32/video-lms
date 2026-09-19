@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import {
   createLecture,
+  deleteLecture,
   updateActiveLecture,
   updateLecture,
   updateLectureResources,
@@ -30,6 +31,7 @@ router.post('/assignments/:id/submit', requireAdmin, submitAssignment)
 router.put('/modules/:index', requireAdmin, updateModule)
 router.put('/modules/:moduleIndex/lectures/:lectureIndex', requireAdmin, updateLecture)
 router.put('/modules/:moduleIndex/lectures/:lectureIndex/resources', requireAdmin, updateLectureResources)
+router.delete('/modules/:moduleIndex/lectures/:lectureIndex', requireAdmin, deleteLecture)
 router.put('/lecture', requireAdmin, updateActiveLecture)
 router.post('/lectures', requireAdmin, createLecture)
 
