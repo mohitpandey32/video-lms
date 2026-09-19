@@ -1,0 +1,91 @@
+{
+  "course": {
+    "title": "Modern Product Strategy",
+    "eyebrow": "PS—204 · Autumn cohort",
+    "instructor": "Maya Chen",
+    "progress": 42
+  },
+  "lecture": {
+    "title": "Big Data Fundamentals & Introduction to Spark",
+    "duration": "18 min",
+    "done": true,
+    "active": true,
+    "videoUrl": "https://drive.google.com/file/d/1btlkrtaGUWqqVO1HA4U-Uv55cYv4jMOc/view",
+    "embedUrl": "https://drive.google.com/file/d/1btlkrtaGUWqqVO1HA4U-Uv55cYv4jMOc/preview",
+    "classNotesUrl": "",
+    "assignmentPdfUrl": "",
+    "number": "03",
+    "moduleTitle": "Spark"
+  },
+  "notes": "Three prompts to revisit:\n\n• What did the customer do—not just say?\n• Which workarounds reveal an unmet need?\n• Where does observed behavior conflict with the interview?",
+  "modules": [
+    {
+      "title": "01 · SQL",
+      "lessons": [
+        {
+          "title": "Introduction to Databases & RDBMS",
+          "duration": "12 min",
+          "done": true,
+          "active": false
+        },
+        {
+          "title": "SQL Fundamentals – SELECT & Filtering",
+          "duration": "21 min",
+          "done": true,
+          "active": false
+        }
+      ]
+    },
+    {
+      "title": "Spark",
+      "lessons": [
+        {
+          "title": "Big Data Fundamentals & Introduction to Spark",
+          "duration": "18 min",
+          "done": true,
+          "active": true,
+          "videoUrl": "https://drive.google.com/file/d/1btlkrtaGUWqqVO1HA4U-Uv55cYv4jMOc/view",
+          "embedUrl": "https://drive.google.com/file/d/1btlkrtaGUWqqVO1HA4U-Uv55cYv4jMOc/preview",
+          "classNotesUrl": "",
+          "assignmentPdfUrl": ""
+        },
+        {
+          "id": "lecture-signal-research",
+          "title": "Spark Architecture: Driver, Executors & Cluster",
+          "number": "04",
+          "duration": "28 min",
+          "videoUrl": "https://drive.google.com/file/d/190YULO1Nt0CZWvvMhaPtrp8MX_VDtxef/",
+          "embedUrl": "https://drive.google.com/file/d/190YULO1Nt0CZWvvMhaPtrp8MX_VDtxef/preview",
+          "active": false,
+          "classNotesUrl": "",
+          "assignmentPdfUrl": ""
+        }
+      ]
+    },
+    {
+      "title": "03 · Make the bet",
+      "lessons": [
+        {
+          "title": "Opportunity mapping",
+          "duration": "24 min",
+          "active": false
+        },
+        {
+          "title": "Designing useful experiments",
+          "duration": "31 min",
+          "active": false
+        }
+      ]
+    }
+  ],
+  "assignments": [
+    {
+      "id": "signal-map",
+      "title": "Build a signal map",
+      "description": "Synthesize five interview observations into behaviors, tensions, and opportunities.",
+      "due": "Sep 26",
+      "status": "open",
+      "submission": ""
+    }
+  ]
+}

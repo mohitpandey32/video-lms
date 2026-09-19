@@ -1,0 +1,26 @@
+[
+  {
+    "id": "admin-mohit-pandey",
+    "name": "Mohit Pandey",
+    "email": "pandeymohit998@gmail.com",
+    "passwordHash": "$2b$12$E.pJeb6EfMVpawZbxJzUse79YTDUlL/0R/BShTncvAIEIh6G1d/Q2",
+    "role": "admin",
+    "createdAt": "2026-09-19T00:00:00.000Z"
+  },
+  {
+    "id": "9a903411-878d-4c97-be6e-9c54f2ae1487",
+    "name": "Aditya",
+    "email": "aditya876hooda@gmail.com",
+    "passwordHash": "$2b$12$AQIKwhqg.NiBOYUV7FS9l.qQSmP2kzbEkYL50kZrZXc17A524DyvW",
+    "role": "student",
+    "createdAt": "2026-09-19T16:12:54.026Z"
+  },
+  {
+    "id": "29c6fdd8-dbcb-4dc3-a061-c81794e19d1b",
+    "name": "Vibhore Sharma",
+    "email": "vibhore098ssharma@gmail.com",
+    "passwordHash": "$2b$12$eLdB9NOUutD8zbrJuwL7N.UHSm1RdRpmqGMyVNoIyySbRLdb/pZre",
+    "role": "admin",
+    "createdAt": "2026-09-19T16:35:38.274Z"
+  }
+]
