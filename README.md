@@ -63,6 +63,12 @@ SESSION_SECRET=replace-with-a-long-random-secret
 CLIENT_ORIGIN=https://video-lms-bkyz7.sevalla.app
 ```
 
+Set this variable for both build and runtime so Sevalla uses a MongoDB-driver-compatible Node release:
+
+```env
+NIXPACKS_NODE_VERSION=22
+```
+
 Sevalla provides `PORT`; do not set it manually. After the backend is deployed, verify:
 
 ```text
