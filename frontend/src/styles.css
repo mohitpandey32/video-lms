@@ -158,7 +158,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .notes-pane > textarea, .assignment-pane > textarea { width: 100%; min-height: 190px; margin-top: 22px; padding: 22px 0; resize: vertical; border: solid var(--line); border-width: 1px 0; background: transparent; color: var(--ink); line-height: 1.8; font-size: 13px; outline: 0; }
 .notes-pane > textarea:focus, .assignment-pane > textarea:focus { border-color: #999b93; }
 .note-footer, .assignment-footer { display: flex; justify-content: space-between; align-items: center; padding-top: 16px; color: var(--muted); font-size: 10px; }
-.primary-button { min-height: 38px; border: 0; background: var(--ink); color: white; padding: 0 17px; border-radius: 3px; font-size: 11px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; justify-content: center; }
+.note-actions { display: flex; align-items: center; gap: 8px; }
+.primary-button { min-height: 38px; border: 0; background: var(--ink); color: white; padding: 0 17px; border-radius: 3px; font-size: 11px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; justify-content: center; text-decoration: none; }
 .primary-button:hover { background: #32332e; }
 .primary-button:disabled { opacity: .45; cursor: not-allowed; }
 .primary-button svg { width: 14px; }

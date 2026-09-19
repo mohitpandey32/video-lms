@@ -136,7 +136,7 @@ function CourseRail({ data, open, onClose, onSelect, onEditModule, onEditLecture
               </section>
             ))}
           </div>
-          <div className="instructor"><div className="avatar">MC</div><div><b>{data.course.instructor}</b><span>Course instructor</span></div><ChevronRight /></div>
+          <div className="instructor"><div className="avatar">{data.course.instructor.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</div><div><b>{data.course.instructor}</b><span>Course instructor</span></div><ChevronRight /></div>
         </motion.aside>
       )}
     </AnimatePresence>
@@ -157,28 +157,33 @@ function LectureResources({ lecture }) {
   )
 }
 
-function Notes({ value, onChange, onSave, status }) {
+function Notes({ value, onChange, onSave, status, lectureUrl }) {
   return (
     <motion.div className="notes-pane" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <div className="pane-heading"><div><h3>Lecture notes</h3><p>Your notes are private and saved to this course.</p></div><span className={`save-status ${status === 'Saved' ? 'saved' : ''}`}>{status}</span></div>
       <textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder="Capture an idea, timestamp, or question…" />
-      <div className="note-footer"><span>Markdown-friendly · {value.length.toLocaleString()} characters</span><button className="primary-button" onClick={onSave}>Save notes</button></div>
+      <div className="note-footer"><span>Markdown-friendly · {value.length.toLocaleString()} characters</span><div className="note-actions">{lectureUrl && <a className="primary-button" href={lectureUrl} target="_blank" rel="noreferrer">Open lecture <ExternalLink /></a>}<button className="primary-button" onClick={onSave}>Save notes</button></div></div>
     </motion.div>
   )
 }
 
-function Assignment({ item, onSubmit }) {
+function Assignment({ item, onSubmit, canSubmit = false, assignmentUrl = '' }) {
   const [response, setResponse] = useState(item.submission || '')
   const [error, setError] = useState('')
+  const publishedUrl = item.submission || assignmentUrl
   const submit = async () => { try { setError(''); await onSubmit(response) } catch (err) { setError(err.message) } }
   return (
     <motion.div className="assignment-pane" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="assignment-meta"><span className="status-dot">{item.status === 'submitted' ? 'Submitted' : 'Open'}</span><span>Due {item.due}</span></div>
+      <div className="assignment-meta"><span className="status-dot">{publishedUrl ? 'Published' : 'Open'}</span><span>Due {item.due}</span></div>
       <h3>{item.title}</h3><p>{item.description}</p>
-      <label htmlFor="submission">Response or shareable file link</label>
-      <textarea id="submission" value={response} onChange={(e) => setResponse(e.target.value)} placeholder="Paste a Drive link or write your response…" disabled={item.status === 'submitted'} />
-      {error && <span className="form-error">{error}</span>}
-      <div className="assignment-footer"><span>{item.status === 'submitted' ? 'Your work is with the instructor.' : 'Make sure linked files allow viewer access.'}</span><button className="primary-button" onClick={submit} disabled={item.status === 'submitted'}>{item.status === 'submitted' ? <><Check /> Submitted</> : 'Submit work'}</button></div>
+      {canSubmit ? <>
+        <label htmlFor="submission">Assignment link</label>
+        <textarea id="submission" value={response} onChange={(e) => setResponse(e.target.value)} placeholder="Paste a public Drive, PDF, or assignment URL…" />
+        {error && <span className="form-error">{error}</span>}
+        <div className="assignment-footer"><span>Make sure linked files allow viewer access.</span><button className="primary-button" onClick={submit}>{item.status === 'submitted' ? 'Update assignment link' : 'Publish assignment link'}</button></div>
+      </> : publishedUrl
+        ? <div className="assignment-footer"><span>Your instructor has published the assignment.</span><a className="primary-button" href={publishedUrl} target="_blank" rel="noreferrer">Open assignment <ExternalLink /></a></div>
+        : <div className="assignment-footer"><span>The course administrator has not published an assignment link yet.</span></div>}
     </motion.div>
   )
 }
@@ -589,8 +594,8 @@ export default function App() {
             <button className={activeTab === 'outline' ? 'active' : ''} onClick={() => setActiveTab('outline')}><List /> Lesson details</button>
           </div>
           <AnimatePresence mode="wait">
-            {activeTab === 'notes' && <Notes key="notes" value={notes} onChange={(value) => { setNotes(value); setNoteStatus('Unsaved changes') }} onSave={saveNotes} status={noteStatus} />}
-            {activeTab === 'assignment' && <Assignment key="assignment" item={data.assignments[0]} onSubmit={submitAssignment} />}
+            {activeTab === 'notes' && <Notes key="notes" value={notes} onChange={(value) => { setNotes(value); setNoteStatus('Unsaved changes') }} onSave={saveNotes} status={noteStatus} lectureUrl={data.lecture.videoUrl} />}
+            {activeTab === 'assignment' && <Assignment key="assignment" item={data.assignments[0]} onSubmit={submitAssignment} canSubmit={canEdit} assignmentUrl={data.lecture.assignmentPdfUrl} />}
             {activeTab === 'outline' && <motion.div key="outline" className="details-pane" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><div><span>In this lesson</span><h3>Turn raw conversations into evidence your team can use.</h3></div><ol><li><span>00:00</span>What counts as a signal</li><li><span>07:42</span>Separate behavior from opinion</li><li><span>18:10</span>Build the opportunity map</li></ol></motion.div>}
           </AnimatePresence>
         </section>

@@ -25,7 +25,7 @@ router.put('/progress/:moduleIndex/:lectureIndex', updateProgress)
 router.put('/lectures/:id/select', selectLectureById)
 router.put('/modules/:moduleIndex/lectures/:lectureIndex/select', selectLecture)
 router.put('/notes', saveNotes)
-router.post('/assignments/:id/submit', submitAssignment)
+router.post('/assignments/:id/submit', requireAdmin, submitAssignment)
 
 router.put('/modules/:index', requireAdmin, updateModule)
 router.put('/modules/:moduleIndex/lectures/:lectureIndex', requireAdmin, updateLecture)

@@ -77,6 +77,12 @@ https://YOUR-BACKEND-DOMAIN/api/health
 
 The response should be `{"status":"ok"}`. Run `npm run migrate:mongo` once from the backend web terminal to import the bundled course and users.
 
+For an existing database, synchronize course title and instructor metadata without replacing modules, users, or progress:
+
+```bash
+npm run sync:course-metadata
+```
+
 ### Frontend — Static Site Hosting
 
 Keep the existing static frontend and configure:

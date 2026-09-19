@@ -10,7 +10,8 @@
     "install:all": "npm ci --prefix backend && npm ci --prefix frontend",
     "build": "npm run build --prefix frontend",
     "start": "npm start --prefix backend",
-    "migrate:mongo": "npm run migrate:mongo --prefix backend"
+    "migrate:mongo": "npm run migrate:mongo --prefix backend",
+    "sync:course-metadata": "npm run sync:course-metadata --prefix backend"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

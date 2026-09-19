@@ -1,6 +1,7 @@
 import { getCourse, saveCourse } from '../models/courseModel.js'
 import { getUserProgress, saveUserProgress } from '../models/progressModel.js'
 import { applyUserProgress, getProgressSummary, lessonKey } from '../services/courseService.js'
+import { isValidWebUrl } from '../utils/url.js'
 
 export async function showCourse(req, res) {
   try {
@@ -94,9 +95,9 @@ export async function saveNotes(req, res) {
 }
 
 export async function submitAssignment(req, res) {
-  const { response } = req.body
-  if (!response?.trim()) {
-    return res.status(400).json({ message: 'Add a response or submission link first.' })
+  const submission = String(req.body.response || '').trim()
+  if (!submission || !isValidWebUrl(submission)) {
+    return res.status(400).json({ message: 'Add a valid HTTP or HTTPS assignment link.' })
   }
 
   try {
@@ -104,7 +105,7 @@ export async function submitAssignment(req, res) {
     const assignment = course.assignments.find((item) => item.id === req.params.id)
     if (!assignment) return res.status(404).json({ message: 'Assignment not found.' })
     assignment.status = 'submitted'
-    assignment.submission = response.trim()
+    assignment.submission = submission
     assignment.submittedAt = new Date().toISOString()
     await saveCourse(course)
     res.json(assignment)
