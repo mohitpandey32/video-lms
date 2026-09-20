@@ -4,7 +4,7 @@ import { api } from './api'
 import {
   ArrowLeft, BookOpen, Check, ChevronDown, ChevronRight, Circle,
   ClipboardList, ExternalLink, Eye, FileText, Gauge, Github, GraduationCap, GripVertical, LayoutList,
-  Link2, List, LockKeyhole, LogOut, Mail, Maximize, Menu, MoreHorizontal, Pause, PencilLine,
+  Link2, List, LockKeyhole, LogOut, Mail, Maximize, Menu, Minimize, MoreHorizontal, Pause, PencilLine,
   Play, Plus, Settings2, ShieldCheck, SkipBack, SkipForward, Upload, UserRound,
   Trash2, VideoOff, Volume2, VolumeX, X,
 } from 'lucide-react'
@@ -22,17 +22,48 @@ function isDriveUrl(url = '') {
 function Player({ lecture, onComplete }) {
   const videoRef = useRef(null)
   const playerRef = useRef(null)
+  const controlsTimerRef = useRef(null)
   const [playing, setPlaying] = useState(false)
   const [current, setCurrent] = useState(0)
   const [duration, setDuration] = useState(0)
   const [volume, setVolume] = useState(0.8)
   const [speed, setSpeed] = useState(1)
   const [showSpeed, setShowSpeed] = useState(false)
+  const [controlsVisible, setControlsVisible] = useState(true)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [videoAspect, setVideoAspect] = useState('16 / 9')
   const drive = isDriveUrl(lecture.videoUrl)
 
   useEffect(() => {
-    setPlaying(false); setCurrent(0); setDuration(0)
+    setPlaying(false); setCurrent(0); setDuration(0); setControlsVisible(true); setVideoAspect('16 / 9')
   }, [lecture.videoUrl])
+
+  useEffect(() => {
+    const syncFullscreen = () => {
+      const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement
+      setIsFullscreen(fullscreenElement === playerRef.current)
+      setControlsVisible(true)
+    }
+    document.addEventListener('fullscreenchange', syncFullscreen)
+    document.addEventListener('webkitfullscreenchange', syncFullscreen)
+    return () => {
+      document.removeEventListener('fullscreenchange', syncFullscreen)
+      document.removeEventListener('webkitfullscreenchange', syncFullscreen)
+    }
+  }, [])
+
+  const revealControls = () => {
+    setControlsVisible(true)
+    window.clearTimeout(controlsTimerRef.current)
+    if (playing && !showSpeed) {
+      controlsTimerRef.current = window.setTimeout(() => setControlsVisible(false), 2200)
+    }
+  }
+
+  useEffect(() => {
+    revealControls()
+    return () => window.clearTimeout(controlsTimerRef.current)
+  }, [playing, showSpeed, lecture.videoUrl])
 
   const toggle = () => {
     const video = videoRef.current
@@ -54,6 +85,21 @@ function Player({ lecture, onComplete }) {
     if (videoRef.current) videoRef.current.playbackRate = next
   }
 
+  const toggleFullscreen = async () => {
+    const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement
+    try {
+      if (fullscreenElement === playerRef.current) {
+        const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen
+        await exitFullscreen?.call(document)
+      } else if (!fullscreenElement && playerRef.current) {
+        const requestFullscreen = playerRef.current.requestFullscreen || playerRef.current.webkitRequestFullscreen
+        await requestFullscreen?.call(playerRef.current)
+      }
+    } catch {
+      setIsFullscreen(Boolean(document.fullscreenElement || document.webkitFullscreenElement))
+    }
+  }
+
   if (!lecture.videoUrl) {
     return <div className="player player--empty"><span><VideoOff /></span><div><b>Video not published yet</b><p>You can still review the available lesson resources.</p></div></div>
   }
@@ -68,12 +114,26 @@ function Player({ lecture, onComplete }) {
   }
 
   return (
-    <div className="player" ref={playerRef} onDoubleClick={() => playerRef.current?.requestFullscreen()}>
+    <div
+      className={`player ${playing ? 'playing' : 'paused'} ${controlsVisible ? 'controls-visible' : 'controls-hidden'}`}
+      ref={playerRef}
+      style={{ '--video-aspect': videoAspect }}
+      onDoubleClick={toggleFullscreen}
+      onPointerMove={revealControls}
+      onPointerLeave={() => { if (playing && !showSpeed) setControlsVisible(false) }}
+      onFocusCapture={revealControls}
+    >
       <video
         ref={videoRef} src={lecture.embedUrl || lecture.videoUrl} preload="metadata"
         onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
         onTimeUpdate={(event) => setCurrent(event.currentTarget.currentTime)}
-        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
+        onLoadedMetadata={(event) => {
+          const video = event.currentTarget
+          setDuration(video.duration)
+          if (video.videoWidth && video.videoHeight) setVideoAspect(`${video.videoWidth} / ${video.videoHeight}`)
+          video.volume = volume
+          video.playbackRate = speed
+        }}
         onEnded={() => { setPlaying(false); onComplete?.() }}
       />
       <button className="center-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}>
@@ -97,7 +157,7 @@ function Player({ lecture, onComplete }) {
               <button onClick={() => setShowSpeed(!showSpeed)}>{speed}×</button>
               <AnimatePresence>{showSpeed && <motion.div className="speed-popover" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>{[0.75, 1, 1.25, 1.5, 2].map((rate) => <button key={rate} className={rate === speed ? 'active' : ''} onClick={() => changeSpeed(rate)}>{rate}×</button>)}</motion.div>}</AnimatePresence>
             </div>
-            <button onClick={() => playerRef.current?.requestFullscreen()} aria-label="Fullscreen"><Maximize /></button>
+            <button onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>{isFullscreen ? <Minimize /> : <Maximize />}</button>
           </div>
         </div>
       </div>

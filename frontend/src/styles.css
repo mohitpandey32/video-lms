@@ -88,8 +88,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .lecture-stage { background: var(--stage); padding: 34px clamp(24px, 4vw, 66px) 40px; color: white; }
 .stage-kicker { max-width: 1180px; margin: 0 auto 16px; display: flex; align-items: center; gap: 10px; color: #9b9d96; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
 .stage-kicker i { width: 18px; height: 1px; background: #4b4d47; }
-.player { position: relative; max-width: 1180px; aspect-ratio: 16/8.7; margin: 0 auto; background: #080907; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.32); }
-.player video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.player { position: relative; width: 100%; max-width: 1180px; aspect-ratio: var(--video-aspect, 16 / 9); margin: 0 auto; background: #080907; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.32); }
+.player video { width: 100%; height: 100%; object-fit: contain; display: block; }
+.player:fullscreen, .player:-webkit-full-screen { width: 100vw; max-width: none; height: 100vh; aspect-ratio: auto; box-shadow: none; }
+.player.playing.controls-hidden { cursor: none; }
 .player--empty { display: flex; align-items: center; justify-content: center; gap: 16px; color: white; background: radial-gradient(circle at 50% 45%, #22231f 0, #10110f 52%, #080907 100%); }
 .player--empty > span { width: 52px; height: 52px; display: grid; place-items: center; border: 1px solid #454740; border-radius: 50%; color: var(--accent); }
 .player--empty > span svg { width: 20px; }
@@ -97,11 +99,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .player--empty b { font: 500 15px Manrope, sans-serif; }
 .player--empty p { margin: 0; color: #7e8078; font-size: 10px; }
 .center-play { position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%); width: 68px; height: 68px; border: 1px solid rgba(255,255,255,.35); border-radius: 50%; background: rgba(10,11,9,.65); color: white; display: grid; place-items: center; cursor: pointer; backdrop-filter: blur(8px); transition: opacity .2s, transform .2s; }
-.player:has(video:not(:paused)) .center-play { opacity: 0; }
-.player:hover .center-play { opacity: 1; }
+.player.playing .center-play { opacity: 0; }
+.player.playing.controls-visible .center-play { opacity: 1; }
+.player.playing.controls-hidden .center-play { pointer-events: none; }
 .center-play:hover { transform: translate(-50%, -50%) scale(1.07); }
 .center-play svg { width: 25px; }
-.controls { position: absolute; inset: auto 0 0; padding: 26px 22px 15px; background: linear-gradient(transparent, rgba(0,0,0,.8)); }
+.controls { position: absolute; inset: auto 0 0; padding: 26px 22px 15px; background: linear-gradient(transparent, rgba(0,0,0,.8)); transition: opacity .22s ease, transform .22s ease; }
+.player.controls-hidden .controls { opacity: 0; transform: translateY(8px); pointer-events: none; }
 .timeline { width: 100%; appearance: none; height: 3px; background: linear-gradient(to right, var(--accent) var(--played), rgba(255,255,255,.35) var(--played)); cursor: pointer; display: block; }
 .timeline::-webkit-slider-thumb { appearance: none; width: 11px; height: 11px; border-radius: 50%; background: var(--accent); }
 .control-row, .control-cluster { display: flex; align-items: center; }
@@ -407,7 +411,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
   .admin-return-button::before { content: 'A'; font: 700 11px Manrope, sans-serif; }
   .upload-button { width: 36px; padding: 0; justify-content: center; border-radius: 50%; }
   .lecture-stage { padding: 22px 14px 28px; }
-  .player { aspect-ratio: 16/10; }
   .center-play { width: 54px; height: 54px; }
   .volume, .time, .control-cluster > button:first-child, .control-cluster > button:nth-child(3) { display: none; }
   .lecture-heading { align-items: flex-start; }
