@@ -4,7 +4,7 @@ import { api } from './api'
 import {
   ArrowLeft, BookOpen, Check, ChevronDown, ChevronRight, Circle,
   ClipboardList, ExternalLink, Eye, FileText, Gauge, GraduationCap, LayoutList,
-  Link2, List, LockKeyhole, LogOut, Mail, Maximize, Menu, Pause, PencilLine,
+  Link2, List, LockKeyhole, LogOut, Mail, Maximize, Menu, MoreHorizontal, Pause, PencilLine,
   Play, Plus, Settings2, ShieldCheck, SkipBack, SkipForward, Upload, UserRound,
   Trash2, VideoOff, Volume2, VolumeX, X,
 } from 'lucide-react'
@@ -186,8 +186,8 @@ function VideoModal({ lecture, onClose, onSave }) {
   )
 }
 
-function NewLectureModal({ modules, onClose, onCreate }) {
-  const [form, setForm] = useState({ title: '', moduleIndex: '1', duration: '', videoUrl: '', classNotesUrl: '', assignmentPdfUrl: '' })
+function NewLectureModal({ modules, initialModuleIndex = 0, onClose, onCreate }) {
+  const [form, setForm] = useState({ title: '', moduleIndex: String(initialModuleIndex), duration: '', videoUrl: '', classNotesUrl: '', assignmentPdfUrl: '' })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const update = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }))
@@ -396,9 +396,29 @@ function AuthScreen({ onAuthenticate }) {
 }
 
 function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditModule, onEditLecture, onEditResources, onDeleteLecture }) {
+  const [openMenu, setOpenMenu] = useState(null)
   const lessonCount = data.modules.reduce((total, module) => total + module.lessons.length, 0)
   const videoCount = data.modules.reduce((total, module) => total + module.lessons.filter((lesson) => lesson.videoUrl).length, 0)
   const pdfCount = data.modules.reduce((total, module) => total + module.lessons.filter((lesson) => lesson.classNotesUrl || lesson.assignmentPdfUrl).length, 0)
+
+  useEffect(() => {
+    if (!openMenu) return undefined
+    const closeMenu = (event) => {
+      if (event.key === 'Escape' || !event.target.closest?.('.admin-lesson-menu')) setOpenMenu(null)
+    }
+    document.addEventListener('pointerdown', closeMenu)
+    document.addEventListener('keydown', closeMenu)
+    return () => {
+      document.removeEventListener('pointerdown', closeMenu)
+      document.removeEventListener('keydown', closeMenu)
+    }
+  }, [openMenu])
+
+  const runAction = (action) => {
+    setOpenMenu(null)
+    action()
+  }
+
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
@@ -407,22 +427,39 @@ function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditM
         <div className="admin-account"><span className="avatar">{user.name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</span><div><b>{user.name}</b><span>Administrator</span></div><button onClick={onLogout} aria-label="Log out" title="Log out"><LogOut /></button></div>
       </aside>
       <main className="admin-main">
-        <header className="admin-header"><div><span className="overline">COURSE MANAGEMENT</span><h1>{data.course.title}</h1><p>Structure modules and publish lecture videos.</p></div><button className="primary-button admin-add" onClick={onNewLecture}><Plus /> Add lecture</button></header>
-        <section className="admin-summary"><div><span>Modules</span><strong>{String(data.modules.length).padStart(2, '0')}</strong></div><div><span>Lectures</span><strong>{String(lessonCount).padStart(2, '0')}</strong></div><div><span>With video</span><strong>{String(videoCount).padStart(2, '0')}</strong></div><div><span>With PDFs</span><strong>{String(pdfCount).padStart(2, '0')}</strong></div></section>
+        <header className="admin-header"><div><span className="overline">COURSE CONTENT</span><h1>{data.course.title}</h1><p>Manage the lesson sequence, video sources, notes, and assignments.</p></div><button className="primary-button admin-add" onClick={() => onNewLecture(0)}><Plus /> New lecture</button></header>
+        <dl className="admin-metrics"><div><dt>Modules</dt><dd>{String(data.modules.length).padStart(2, '0')}</dd></div><div><dt>Lectures</dt><dd>{String(lessonCount).padStart(2, '0')}</dd></div><div><dt>Video ready</dt><dd>{String(videoCount).padStart(2, '0')}</dd></div><div><dt>With resources</dt><dd>{String(pdfCount).padStart(2, '0')}</dd></div></dl>
         <section className="admin-content">
-          <div className="admin-section-heading"><div><h2>Course outline</h2><p>Edit names or add a new lecture to any module.</p></div><span>{lessonCount} lectures</span></div>
+          <div className="admin-section-heading"><div><h2>Course outline</h2><p>Lectures appear to students in this order.</p></div><span>{lessonCount} total</span></div>
           {data.modules.map((module, moduleIndex) => (
             <motion.section className="admin-module" key={moduleIndex} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: moduleIndex * .05 }}>
-              <header><div><span>{String(moduleIndex + 1).padStart(2, '0')}</span><h3>{module.title.replace(/^\d+\s*·\s*/, '')}</h3></div><button onClick={() => onEditModule(moduleIndex, module.title)}><PencilLine /> Edit module</button></header>
+              <header>
+                <div className="admin-module-title"><span>Module {String(moduleIndex + 1).padStart(2, '0')}</span><div><h3>{module.title.replace(/^\d+\s*·\s*/, '')}</h3><p>{module.lessons.length} {module.lessons.length === 1 ? 'lecture' : 'lectures'}</p></div></div>
+                <div className="admin-module-actions"><button onClick={() => onEditModule(moduleIndex, module.title)}><PencilLine /> Rename</button><button className="module-add" onClick={() => onNewLecture(moduleIndex)}><Plus /> Add lecture</button></div>
+              </header>
               <div className="admin-lessons">
-                {module.lessons.map((lesson, lectureIndex) => (
-                  <div className="admin-lesson" key={lesson.id || `${moduleIndex}-${lectureIndex}`}>
-                    <span className={`admin-lesson-state ${lesson.videoUrl ? 'published' : ''}`}>{lesson.videoUrl ? <Play fill="currentColor" /> : <Circle />}</span>
-                    <div><b>{lesson.title}</b><span>{lesson.duration} · {lesson.videoUrl ? 'Video ready' : 'No video'} · {[lesson.classNotesUrl, lesson.assignmentPdfUrl].filter(Boolean).length} PDFs</span></div>
-                    {lesson.active && <span className="current-chip">Currently open</span>}
-                    <div className="admin-lesson-actions"><button onClick={() => onEditResources(moduleIndex, lectureIndex, lesson)}><Link2 /> Resources</button><button onClick={() => onEditLecture(moduleIndex, lectureIndex, lesson.title)}><PencilLine /> Name</button><button className="delete-action" onClick={() => onDeleteLecture(moduleIndex, lectureIndex, lesson)}><Trash2 /> Delete</button></div>
-                  </div>
-                ))}
+                {module.lessons.map((lesson, lectureIndex) => {
+                  const menuKey = `${moduleIndex}:${lectureIndex}`
+                  const lessonNumber = data.modules.slice(0, moduleIndex).reduce((total, item) => total + item.lessons.length, 0) + lectureIndex + 1
+                  const resourceCount = [lesson.classNotesUrl, lesson.assignmentPdfUrl].filter(Boolean).length
+                  return (
+                    <motion.div className="admin-lesson" key={lesson.id || menuKey} whileHover={{ x: 3 }} transition={{ duration: .15 }}>
+                      <span className="admin-lesson-number">{String(lessonNumber).padStart(2, '0')}</span>
+                      <div className="admin-lesson-copy"><b>{lesson.title}</b><span className={lesson.videoUrl ? 'ready' : 'draft'}>{lesson.duration} · {lesson.videoUrl ? 'Video ready' : 'Video needed'} · {resourceCount} {resourceCount === 1 ? 'resource' : 'resources'}</span></div>
+                      {lesson.active && <span className="current-chip">Open now</span>}
+                      <div className="admin-lesson-menu">
+                        <button className="menu-trigger" onClick={() => setOpenMenu(openMenu === menuKey ? null : menuKey)} aria-label={`Actions for ${lesson.title}`} aria-expanded={openMenu === menuKey}><MoreHorizontal /></button>
+                        <AnimatePresence>{openMenu === menuKey && <motion.div className="lecture-menu-popover" initial={{ opacity: 0, y: -4, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: .98 }} transition={{ duration: .14 }}>
+                          <button onClick={() => runAction(() => onEditLecture(moduleIndex, lectureIndex, lesson.title))}><PencilLine /> Rename lecture</button>
+                          <button onClick={() => runAction(() => onEditResources(moduleIndex, lectureIndex, lesson))}><Link2 /> Video & resources</button>
+                          <span />
+                          <button className="delete-action" onClick={() => runAction(() => onDeleteLecture(moduleIndex, lectureIndex, lesson))}><Trash2 /> Delete lecture</button>
+                        </motion.div>}</AnimatePresence>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+                {!module.lessons.length && <div className="admin-empty-module"><span>No lectures in this module</span><button onClick={() => onNewLecture(moduleIndex)}><Plus /> Add the first lecture</button></div>}
               </div>
             </motion.section>
           ))}
@@ -439,7 +476,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('notes')
   const [railOpen, setRailOpen] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
-  const [newLectureOpen, setNewLectureOpen] = useState(false)
+  const [newLectureModuleIndex, setNewLectureModuleIndex] = useState(null)
   const [editingModule, setEditingModule] = useState(null)
   const [editingLecture, setEditingLecture] = useState(null)
   const [editingResources, setEditingResources] = useState(null)
@@ -556,8 +593,8 @@ export default function App() {
   if (canEdit && !adminPreview) {
     return (
       <>
-        <AdminDashboard data={data} user={user} onPreview={() => setAdminPreview(true)} onLogout={logout} onNewLecture={() => setNewLectureOpen(true)} onEditModule={(index, title) => setEditingModule({ index, title })} onEditLecture={(moduleIndex, lectureIndex, title) => setEditingLecture({ moduleIndex, lectureIndex, title })} onEditResources={(moduleIndex, lectureIndex, lecture) => setEditingResources({ moduleIndex, lectureIndex, ...lecture })} onDeleteLecture={(moduleIndex, lectureIndex, lecture) => setDeletingLecture({ moduleIndex, lectureIndex, title: lecture.title })} />
-        <AnimatePresence>{newLectureOpen && <NewLectureModal modules={data.modules} onClose={() => setNewLectureOpen(false)} onCreate={createLecture} />}</AnimatePresence>
+        <AdminDashboard data={data} user={user} onPreview={() => setAdminPreview(true)} onLogout={logout} onNewLecture={(moduleIndex) => setNewLectureModuleIndex(moduleIndex)} onEditModule={(index, title) => setEditingModule({ index, title })} onEditLecture={(moduleIndex, lectureIndex, title) => setEditingLecture({ moduleIndex, lectureIndex, title })} onEditResources={(moduleIndex, lectureIndex, lecture) => setEditingResources({ moduleIndex, lectureIndex, ...lecture })} onDeleteLecture={(moduleIndex, lectureIndex, lecture) => setDeletingLecture({ moduleIndex, lectureIndex, title: lecture.title })} />
+        <AnimatePresence>{newLectureModuleIndex !== null && <NewLectureModal modules={data.modules} initialModuleIndex={newLectureModuleIndex} onClose={() => setNewLectureModuleIndex(null)} onCreate={createLecture} />}</AnimatePresence>
         <AnimatePresence>{editingModule && <EditModuleModal module={editingModule} onClose={() => setEditingModule(null)} onSave={updateModule} />}</AnimatePresence>
         <AnimatePresence>{editingLecture && <EditLectureModal lecture={editingLecture} onClose={() => setEditingLecture(null)} onSave={updateLectureName} />}</AnimatePresence>
         <AnimatePresence>{editingResources && <LectureResourcesModal lecture={editingResources} onClose={() => setEditingResources(null)} onSave={updateLectureResources} />}</AnimatePresence>

@@ -246,41 +246,56 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .admin-account button { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: #85877f; cursor: pointer; }
 .admin-account button:hover { background: #2a2b26; color: white; }
 .admin-account button svg { width: 13px; }
-.admin-main { min-width: 0; padding: 44px clamp(30px, 5vw, 72px) 70px; }
-.admin-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; padding-bottom: 31px; border-bottom: 1px solid var(--line); }
-.admin-header h1 { margin: 8px 0 5px; font: 600 clamp(27px, 3vw, 40px) Manrope, sans-serif; letter-spacing: -.04em; }
+.admin-main { width: 100%; max-width: 1440px; min-width: 0; padding: 44px clamp(30px, 5vw, 72px) 80px; }
+.admin-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; padding-bottom: 28px; border-bottom: 1px solid var(--ink); }
+.admin-header h1 { margin: 8px 0 7px; font: 600 clamp(27px, 3vw, 40px) Manrope, sans-serif; letter-spacing: -.04em; }
 .admin-header p { margin: 0; color: var(--muted); font-size: 11px; }
-.admin-add { min-height: 42px; padding: 0 18px; }
-.admin-summary { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); }
-.admin-summary > div { padding: 24px 0; display: flex; flex-direction: column; gap: 8px; }
-.admin-summary span { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
-.admin-summary strong { font: 500 25px Manrope, sans-serif; }
-.admin-content { padding-top: 38px; }
-.admin-section-heading { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; }
+.admin-add { min-height: 42px; padding: 0 18px; flex: 0 0 auto; }
+.admin-metrics { display: flex; align-items: stretch; margin: 0; border-bottom: 1px solid var(--line); }
+.admin-metrics > div { min-width: 145px; padding: 19px 28px 19px 0; display: flex; align-items: baseline; gap: 12px; }
+.admin-metrics > div + div { padding-left: 28px; border-left: 1px solid var(--line); }
+.admin-metrics dt { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+.admin-metrics dd { margin: 0; font: 500 19px Manrope, sans-serif; }
+.admin-content { padding-top: 42px; }
+.admin-section-heading { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
 .admin-section-heading h2 { margin: 0 0 5px; font: 600 19px Manrope, sans-serif; }
 .admin-section-heading p { margin: 0; color: var(--muted); font-size: 10px; }
 .admin-section-heading > span { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
-.admin-module { border-top: 1px solid var(--ink); margin-bottom: 30px; }
-.admin-module > header { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
-.admin-module > header > div { display: flex; align-items: center; gap: 16px; }
-.admin-module > header span { color: var(--muted); font: 500 11px Manrope, sans-serif; }
+.admin-module { border-top: 1px solid #a9aaa3; margin-bottom: 34px; }
+.admin-module > header { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.admin-module-title { display: flex; align-items: center; gap: 20px; min-width: 0; }
+.admin-module-title > span { color: var(--muted); font: 500 9px Manrope, sans-serif; text-transform: uppercase; letter-spacing: .09em; white-space: nowrap; }
+.admin-module-title > div { min-width: 0; }
 .admin-module h3 { margin: 0; font: 600 15px Manrope, sans-serif; }
-.admin-module > header button, .admin-lesson-actions button { display: flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--muted); font-size: 9px; cursor: pointer; }
-.admin-module > header button:hover, .admin-lesson-actions button:hover { color: var(--ink); }
+.admin-module-title p { margin: 3px 0 0; color: var(--muted); font-size: 9px; }
+.admin-module-actions { display: flex; align-items: center; gap: 5px; }
+.admin-module-actions button { height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; background: transparent; color: var(--muted); font-size: 9px; cursor: pointer; }
+.admin-module-actions button:hover { color: var(--ink); background: rgba(255,255,255,.55); }
+.admin-module-actions .module-add { color: var(--ink); }
 .admin-module button svg { width: 12px; }
 .admin-lessons { border-top: 1px solid var(--line); }
-.admin-lesson { min-height: 62px; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto 218px; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); }
-.admin-lesson-state { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid #c9c7bf; border-radius: 50%; color: #8d8f87; }
-.admin-lesson-state.published { border-color: var(--ink); background: var(--ink); color: var(--accent); }
-.admin-lesson-state svg { width: 10px; }
-.admin-lesson > div { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.admin-lesson { position: relative; min-height: 66px; padding: 0 8px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 38px; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); transition: background .15s ease; }
+.admin-lesson:hover { background: rgba(255,255,255,.62); }
+.admin-lesson-number { color: #9a9c94; font: 500 10px Manrope, sans-serif; }
+.admin-lesson-copy { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .admin-lesson b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 500; }
-.admin-lesson > div span { color: var(--muted); font-size: 9px; }
+.admin-lesson-copy span { color: var(--muted); font-size: 9px; }
+.admin-lesson-copy span::before { content: ''; width: 5px; height: 5px; margin-right: 7px; display: inline-block; border-radius: 50%; background: #a7a9a0; vertical-align: 1px; }
+.admin-lesson-copy span.ready::before { background: #6e941e; }
+.admin-lesson-copy span.draft::before { background: #b97836; }
 .current-chip { padding: 4px 7px; border-radius: 10px; background: #e5f1cc; color: #53760f; font-size: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
-.admin-lesson-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.admin-lesson-actions button { padding: 6px 3px; }
-.admin-lesson-actions .delete-action { color: #a2453d; }
-.admin-lesson-actions .delete-action:hover { color: #7f211a; }
+.admin-lesson-menu { position: relative; display: grid; place-items: center; }
+.menu-trigger { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.menu-trigger:hover, .menu-trigger[aria-expanded='true'] { background: #e6e4dc; color: var(--ink); }
+.menu-trigger svg { width: 16px; }
+.lecture-menu-popover { position: absolute; z-index: 20; top: 36px; right: 0; width: 190px; padding: 6px; background: white; border: 1px solid var(--line); box-shadow: 0 16px 40px rgba(25,26,22,.14); transform-origin: top right; }
+.lecture-menu-popover button { width: 100%; height: 34px; display: flex; align-items: center; gap: 9px; padding: 0 9px; border: 0; background: transparent; color: #50524b; font-size: 10px; text-align: left; cursor: pointer; }
+.lecture-menu-popover button:hover { background: #f2f0e9; color: var(--ink); }
+.lecture-menu-popover button svg { width: 13px; }
+.lecture-menu-popover > span { display: block; height: 1px; margin: 5px 7px; background: var(--line); }
+.lecture-menu-popover .delete-action { color: #9b332b; }
+.admin-empty-module { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+.admin-empty-module button { display: flex; align-items: center; gap: 7px; border: 0; background: transparent; color: var(--ink); font-size: 10px; cursor: pointer; }
 
 .modal-backdrop { position: fixed; inset: 0; z-index: 100; background: rgba(14,15,12,.72); display: grid; place-items: center; padding: 20px; backdrop-filter: blur(7px); }
 .modal { width: min(550px, 100%); background: var(--paper); padding: 28px; box-shadow: 0 30px 90px rgba(0,0,0,.38); }
@@ -361,19 +376,21 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
   .admin-header h1 { font-size: 27px; }
   .admin-add { width: 42px; padding: 0; font-size: 0; }
   .admin-add svg { width: 16px; }
-  .admin-summary { grid-template-columns: repeat(2, 1fr); }
-  .admin-summary > div { padding: 17px 0; }
+  .admin-metrics { display: grid; grid-template-columns: repeat(2, 1fr); }
+  .admin-metrics > div { min-width: 0; padding: 15px 12px 15px 0; }
+  .admin-metrics > div + div { padding-left: 12px; }
+  .admin-metrics > div:nth-child(3) { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
+  .admin-metrics > div:nth-child(4) { border-top: 1px solid var(--line); }
   .admin-section-heading > span { display: none; }
   .admin-module > header { align-items: flex-start; padding: 14px 0; }
-  .admin-module > header > div { align-items: flex-start; gap: 10px; }
+  .admin-module-title { align-items: flex-start; gap: 10px; }
   .admin-module h3 { font-size: 13px; }
-  .admin-module > header button { font-size: 0; }
-  .admin-module > header button svg { width: 14px; }
-  .admin-lesson { grid-template-columns: 25px minmax(0, 1fr) 88px; padding: 8px 0; }
+  .admin-module-actions { gap: 0; }
+  .admin-module-actions button { width: 32px; padding: 0; justify-content: center; font-size: 0; }
+  .admin-module-actions button svg { width: 14px; }
+  .admin-lesson { grid-template-columns: 28px minmax(0, 1fr) 38px; padding: 8px 2px; }
   .admin-lesson .current-chip { display: none; }
-  .admin-lesson-actions { gap: 0; }
-  .admin-lesson-actions button { width: 28px; height: 28px; padding: 0; justify-content: center; font-size: 0; }
-  .admin-lesson-actions button svg { width: 13px; }
+  .lecture-menu-popover { right: -2px; }
   .topbar { height: 62px; padding: 0 14px; }
   .topbar-progress, .upload-button span, .avatar-small, .role-chip { display: none; }
   .admin-return-button { width: 34px; padding: 0; font-size: 0; }
