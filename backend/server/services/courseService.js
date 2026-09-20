@@ -24,10 +24,20 @@ export function getProgressSummary(course, completed) {
 export async function applyUserProgress(course, userId) {
   const progress = await getUserProgress(userId)
   const completed = new Set(progress?.completed || [])
+  const playbackPositions = progress?.playbackPositions || {}
 
   course.modules.forEach((module, moduleIndex) => module.lessons.forEach((lesson, lectureIndex) => {
     lesson.done = completed.has(lessonKey(moduleIndex, lectureIndex))
+    const playback = playbackPositions[lesson.id]
+    lesson.resumeAt = Number(playback?.seconds) || 0
+    lesson.resumeUpdatedAt = playback?.updatedAt || null
   }))
+
+  const activePlayback = playbackPositions[course.lecture?.id]
+  if (course.lecture) {
+    course.lecture.resumeAt = Number(activePlayback?.seconds) || 0
+    course.lecture.resumeUpdatedAt = activePlayback?.updatedAt || null
+  }
 
   Object.assign(course.course, getProgressSummary(course, completed))
   return course

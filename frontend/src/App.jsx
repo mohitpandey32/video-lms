@@ -11,18 +11,25 @@ import {
 
 function formatTime(value) {
   if (!Number.isFinite(value)) return '0:00'
-  const minutes = Math.floor(value / 60)
-  return `${minutes}:${String(Math.floor(value % 60)).padStart(2, '0')}`
+  const totalSeconds = Math.max(0, Math.floor(value))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = String(totalSeconds % 60).padStart(2, '0')
+  return hours ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`
 }
 
 function isDriveUrl(url = '') {
   return url.includes('drive.google.com')
 }
 
-function Player({ lecture, onComplete }) {
+function Player({ lecture, userId, onComplete }) {
   const videoRef = useRef(null)
   const playerRef = useRef(null)
   const controlsTimerRef = useRef(null)
+  const resumeNoticeTimerRef = useRef(null)
+  const lastLocalSecondRef = useRef(0)
+  const lastServerSecondRef = useRef(Number(lecture.resumeAt) || 0)
+  const restoringPositionRef = useRef(false)
   const [playing, setPlaying] = useState(false)
   const [current, setCurrent] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -32,11 +39,63 @@ function Player({ lecture, onComplete }) {
   const [controlsVisible, setControlsVisible] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [videoAspect, setVideoAspect] = useState('16 / 9')
+  const [resumeNotice, setResumeNotice] = useState(null)
   const drive = isDriveUrl(lecture.videoUrl)
+  const playbackStorageKey = lecture.id && userId ? `arcwell:playback:${userId}:${lecture.id}` : ''
 
   useEffect(() => {
-    setPlaying(false); setCurrent(0); setDuration(0); setControlsVisible(true); setVideoAspect('16 / 9')
+    setPlaying(false); setCurrent(0); setDuration(0); setControlsVisible(true); setVideoAspect('16 / 9'); setResumeNotice(null)
+    lastLocalSecondRef.current = 0
+    lastServerSecondRef.current = Number(lecture.resumeAt) || 0
+    restoringPositionRef.current = false
   }, [lecture.videoUrl])
+
+  const normalizePlaybackPosition = (seconds, mediaDuration) => {
+    if (!Number.isFinite(seconds) || !Number.isFinite(mediaDuration) || mediaDuration <= 0) return 0
+    const clamped = Math.min(Math.max(seconds, 0), mediaDuration)
+    return clamped >= 10 && mediaDuration - clamped > 30 ? clamped : 0
+  }
+
+  const cachePlaybackPosition = (video = videoRef.current, force = false) => {
+    if (!playbackStorageKey || !video || !Number.isFinite(video.duration)) return
+    const seconds = normalizePlaybackPosition(video.currentTime, video.duration)
+    if (!force && Math.abs(seconds - lastLocalSecondRef.current) < 5) return
+    try {
+      if (seconds > 0) {
+        localStorage.setItem(playbackStorageKey, JSON.stringify({ seconds, duration: video.duration, updatedAt: Date.now() }))
+      } else {
+        localStorage.removeItem(playbackStorageKey)
+      }
+      lastLocalSecondRef.current = seconds
+    } catch {
+      // Resume still works from MongoDB when browser storage is unavailable.
+    }
+  }
+
+  const syncPlaybackPosition = ({ force = false, keepalive = false, seconds: secondsOverride } = {}) => {
+    const video = videoRef.current
+    if (drive || !lecture.id || !video || !Number.isFinite(video.duration)) return Promise.resolve()
+    const seconds = normalizePlaybackPosition(secondsOverride ?? video.currentTime, video.duration)
+    if (!force && Math.abs(seconds - lastServerSecondRef.current) < 10) return Promise.resolve()
+    const previousSeconds = lastServerSecondRef.current
+    lastServerSecondRef.current = seconds
+    return api.updatePlaybackPosition(lecture.id, { seconds, duration: video.duration }, { keepalive })
+      .catch(() => { lastServerSecondRef.current = previousSeconds })
+  }
+
+  const clearPlaybackPosition = () => {
+    const video = videoRef.current
+    if (!video) return
+    restoringPositionRef.current = true
+    video.currentTime = 0
+    setCurrent(0)
+    setResumeNotice(null)
+    window.clearTimeout(resumeNoticeTimerRef.current)
+    try { if (playbackStorageKey) localStorage.removeItem(playbackStorageKey) } catch { /* Browser storage is optional. */ }
+    lastLocalSecondRef.current = 0
+    lastServerSecondRef.current = 0
+    syncPlaybackPosition({ force: true, seconds: 0 })
+  }
 
   useEffect(() => {
     const syncFullscreen = () => {
@@ -65,6 +124,26 @@ function Player({ lecture, onComplete }) {
     return () => window.clearTimeout(controlsTimerRef.current)
   }, [playing, showSpeed, lecture.videoUrl])
 
+  useEffect(() => {
+    if (!playing || drive || !lecture.id) return undefined
+    const interval = window.setInterval(() => syncPlaybackPosition(), 30000)
+    return () => window.clearInterval(interval)
+  }, [playing, drive, lecture.id])
+
+  useEffect(() => {
+    if (drive || !lecture.id) return undefined
+    const persistBeforeLeaving = () => {
+      cachePlaybackPosition(videoRef.current, true)
+      syncPlaybackPosition({ force: true, keepalive: true })
+    }
+    window.addEventListener('pagehide', persistBeforeLeaving)
+    return () => {
+      window.removeEventListener('pagehide', persistBeforeLeaving)
+      persistBeforeLeaving()
+      window.clearTimeout(resumeNoticeTimerRef.current)
+    }
+  }, [drive, lecture.id])
+
   const toggle = () => {
     const video = videoRef.current
     if (!video) return
@@ -72,7 +151,10 @@ function Player({ lecture, onComplete }) {
   }
 
   const jump = (amount) => {
-    if (videoRef.current) videoRef.current.currentTime += amount
+    if (videoRef.current) {
+      videoRef.current.currentTime += amount
+      syncPlaybackPosition({ force: true })
+    }
   }
 
   const changeVolume = (next) => {
@@ -125,24 +207,59 @@ function Player({ lecture, onComplete }) {
     >
       <video
         ref={videoRef} src={lecture.embedUrl || lecture.videoUrl} preload="metadata"
-        onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
-        onTimeUpdate={(event) => setCurrent(event.currentTarget.currentTime)}
+        onPlay={() => setPlaying(true)} onPause={(event) => { setPlaying(false); cachePlaybackPosition(event.currentTarget, true); syncPlaybackPosition({ force: true }) }}
+        onTimeUpdate={(event) => { setCurrent(event.currentTarget.currentTime); cachePlaybackPosition(event.currentTarget) }}
+        onSeeked={(event) => {
+          if (restoringPositionRef.current) { restoringPositionRef.current = false; return }
+          cachePlaybackPosition(event.currentTarget, true)
+        }}
         onLoadedMetadata={(event) => {
           const video = event.currentTarget
           setDuration(video.duration)
           if (video.videoWidth && video.videoHeight) setVideoAspect(`${video.videoWidth} / ${video.videoHeight}`)
           video.volume = volume
           video.playbackRate = speed
+          const serverSeconds = normalizePlaybackPosition(Number(lecture.resumeAt), video.duration)
+          const serverUpdatedAt = Date.parse(lecture.resumeUpdatedAt || '') || 0
+          let localPosition = null
+          try { localPosition = playbackStorageKey ? JSON.parse(localStorage.getItem(playbackStorageKey)) : null } catch { localPosition = null }
+          const localSeconds = normalizePlaybackPosition(Number(localPosition?.seconds), video.duration)
+          const localUpdatedAt = Number(localPosition?.updatedAt) || 0
+          const resumeAt = localUpdatedAt > serverUpdatedAt ? localSeconds : serverSeconds
+          lastServerSecondRef.current = serverSeconds
+          lastLocalSecondRef.current = localSeconds
+          if (resumeAt > 0) {
+            restoringPositionRef.current = true
+            video.currentTime = resumeAt
+            setCurrent(resumeAt)
+            setResumeNotice(resumeAt)
+            window.clearTimeout(resumeNoticeTimerRef.current)
+            resumeNoticeTimerRef.current = window.setTimeout(() => setResumeNotice(null), 6000)
+            if (localUpdatedAt > serverUpdatedAt && Math.abs(localSeconds - serverSeconds) >= 10) {
+              syncPlaybackPosition({ force: true, seconds: resumeAt })
+            }
+          } else {
+            try { if (playbackStorageKey) localStorage.removeItem(playbackStorageKey) } catch { /* Browser storage is optional. */ }
+          }
         }}
-        onEnded={() => { setPlaying(false); onComplete?.() }}
+        onEnded={() => {
+          setPlaying(false)
+          try { if (playbackStorageKey) localStorage.removeItem(playbackStorageKey) } catch { /* Browser storage is optional. */ }
+          lastLocalSecondRef.current = 0
+          syncPlaybackPosition({ force: true, seconds: 0 })
+          onComplete?.()
+        }}
       />
+      <AnimatePresence>{resumeNotice !== null && <motion.div className="resume-notice" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}><span>Resumed at {formatTime(resumeNotice)}</span><button onClick={clearPlaybackPosition}>Start over</button></motion.div>}</AnimatePresence>
       <button className="center-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}>
         {playing ? <Pause fill="currentColor" /> : <Play fill="currentColor" />}
       </button>
       <div className="controls">
         <input className="timeline" type="range" min="0" max={duration || 0} value={current} step="0.1"
           style={{ '--played': `${duration ? (current / duration) * 100 : 0}%` }}
-          onChange={(event) => { const next = Number(event.target.value); videoRef.current.currentTime = next; setCurrent(next) }} />
+          onChange={(event) => { const next = Number(event.target.value); videoRef.current.currentTime = next; setCurrent(next) }}
+          onPointerUp={() => syncPlaybackPosition({ force: true })}
+          onKeyUp={() => syncPlaybackPosition({ force: true })} />
         <div className="control-row">
           <div className="control-cluster">
             <button onClick={() => jump(-10)} aria-label="Back 10 seconds"><SkipBack /></button>
@@ -751,7 +868,7 @@ export default function App() {
 
         <motion.div key={`${data.lecture.number}-${data.lecture.title}`} className="lecture-stage" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .32 }}>
           <div className="stage-kicker"><span>Now learning</span><i /> <span>Lesson {data.lecture.number} of {String(totalLectures).padStart(2, '0')}</span></div>
-          <Player lecture={data.lecture} onComplete={() => !activeLesson?.done && setLessonCompleted(true)} />
+          <Player lecture={data.lecture} userId={user.id} onComplete={() => !activeLesson?.done && setLessonCompleted(true)} />
           <div className="lecture-heading">
             <div><span className="overline">{activeModule?.title || data.lecture.moduleTitle || 'COURSE LECTURE'}</span><h2>{data.lecture.title}</h2><p>{data.lecture.duration} · {data.lecture.videoUrl ? 'Video lesson' : 'Resources only'}</p></div>
             <div className="lecture-actions"><button className={`complete-button ${activeLesson?.done ? 'completed' : ''}`} onClick={() => setLessonCompleted(!activeLesson?.done)} disabled={progressSaving}>{activeLesson?.done ? <><Check /> Completed</> : <><Circle /> Mark complete</>}</button>{canEdit && <button className="outline-button" onClick={() => setModalOpen(true)}><Settings2 /> Video source</button>}</div>

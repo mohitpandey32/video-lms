@@ -1,6 +1,6 @@
 import { getCourse, saveCourse } from '../models/courseModel.js'
 import { randomUUID } from 'node:crypto'
-import { reindexProgressAfterLectureDelete, remapProgressAfterLectureMove } from '../models/progressModel.js'
+import { reindexProgressAfterLectureDelete, remapProgressAfterLectureMove, removePlaybackPositionsForLecture } from '../models/progressModel.js'
 import { applyUserProgress } from '../services/courseService.js'
 import { driveEmbedUrl, isValidWebUrl } from '../utils/url.js'
 
@@ -106,6 +106,7 @@ export async function deleteLecture(req, res) {
     synchronizeActiveLecture(course)
     await saveCourse(course)
     await reindexProgressAfterLectureDelete(moduleIndex, lectureIndex)
+    await removePlaybackPositionsForLecture(lecture.id)
     res.json(await applyUserProgress(course, req.user.id))
   } catch (error) {
     console.error('Could not delete lecture:', error)

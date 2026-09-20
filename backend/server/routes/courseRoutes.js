@@ -14,6 +14,7 @@ import {
   selectLectureById,
   showCourse,
   submitAssignment,
+  updatePlaybackPosition,
   updateProgress,
 } from '../controllers/courseController.js'
 import { requireAdmin, requireAuth } from '../middleware/authMiddleware.js'
@@ -23,6 +24,7 @@ const router = Router()
 router.use(requireAuth)
 
 router.get('/course', showCourse)
+router.put('/progress/playback/:lectureId', updatePlaybackPosition)
 router.put('/progress/:moduleIndex/:lectureIndex', updateProgress)
 router.put('/lectures/:id/select', selectLectureById)
 router.put('/modules/:moduleIndex/lectures/:lectureIndex/select', selectLecture)

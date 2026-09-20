@@ -77,4 +77,8 @@ export const api = {
     `/api/progress/${moduleIndex}/${lectureIndex}`,
     { method: 'PUT', body: json({ completed }) },
   ),
+  updatePlaybackPosition: (lectureId, payload, options = {}) => request(
+    `/api/progress/playback/${encodeURIComponent(lectureId)}`,
+    { method: 'PUT', body: json(payload), keepalive: options.keepalive === true },
+  ),
 }

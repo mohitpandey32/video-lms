@@ -1,5 +1,5 @@
 import { getCourse, saveCourse } from '../models/courseModel.js'
-import { getUserProgress, saveUserProgress } from '../models/progressModel.js'
+import { getUserProgress, savePlaybackPosition, saveUserProgress } from '../models/progressModel.js'
 import { applyUserProgress, getProgressSummary, lessonKey } from '../services/courseService.js'
 import { isValidWebUrl } from '../utils/url.js'
 
@@ -31,6 +31,33 @@ export async function updateProgress(req, res) {
     res.json({ completed: completedValue, ...getProgressSummary(course, completed) })
   } catch {
     res.status(500).json({ message: 'Could not update course progress.' })
+  }
+}
+
+export async function updatePlaybackPosition(req, res) {
+  const lectureId = String(req.params.lectureId || '')
+  const seconds = Number(req.body.seconds)
+  const duration = Number(req.body.duration)
+
+  if (!/^[a-zA-Z0-9_-]{1,160}$/.test(lectureId)
+    || !Number.isFinite(seconds) || seconds < 0
+    || !Number.isFinite(duration) || duration <= 0) {
+    return res.status(400).json({ message: 'Use a valid lecture and playback position.' })
+  }
+
+  try {
+    const course = await getCourse()
+    const lectureExists = course.modules.some((module) => module.lessons.some((lecture) => lecture.id === lectureId))
+    if (!lectureExists) return res.status(404).json({ message: 'Lecture not found.' })
+
+    const clampedDuration = Math.min(duration, 24 * 60 * 60)
+    const clampedSeconds = Math.min(seconds, clampedDuration)
+    const resumableSeconds = clampedSeconds >= 10 && clampedDuration - clampedSeconds > 30
+      ? Math.round(clampedSeconds * 10) / 10
+      : 0
+    res.json(await savePlaybackPosition(req.user.id, lectureId, resumableSeconds, clampedDuration))
+  } catch {
+    res.status(500).json({ message: 'Could not save the playback position.' })
   }
 }
 

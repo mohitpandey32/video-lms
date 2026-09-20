@@ -10,8 +10,31 @@ export async function getUserProgress(userId) {
 
 export async function saveUserProgress(userId, completed) {
   const progress = { userId, completed, updatedAt: new Date().toISOString() }
-  await (await progressCollection()).replaceOne({ userId }, progress, { upsert: true })
+  await (await progressCollection()).updateOne(
+    { userId },
+    { $set: progress },
+    { upsert: true },
+  )
   return progress
+}
+
+export async function savePlaybackPosition(userId, lectureId, seconds, duration) {
+  const collection = await progressCollection()
+  const updatedAt = new Date().toISOString()
+  const field = `playbackPositions.${lectureId}`
+  const update = seconds > 0
+    ? { $set: { userId, [field]: { seconds, duration, updatedAt }, updatedAt } }
+    : { $set: { userId, updatedAt }, $unset: { [field]: '' } }
+  await collection.updateOne({ userId }, update, { upsert: true })
+  return seconds > 0 ? { seconds, duration, updatedAt } : { seconds: 0, duration, updatedAt }
+}
+
+export async function removePlaybackPositionsForLecture(lectureId) {
+  if (!lectureId) return
+  await (await progressCollection()).updateMany(
+    { [`playbackPositions.${lectureId}`]: { $exists: true } },
+    { $unset: { [`playbackPositions.${lectureId}`]: '' } },
+  )
 }
 
 export function reindexCompletedLessonKeys(completed, deletedModuleIndex, deletedLectureIndex) {
