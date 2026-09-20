@@ -443,7 +443,7 @@ function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditM
                   const lessonNumber = data.modules.slice(0, moduleIndex).reduce((total, item) => total + item.lessons.length, 0) + lectureIndex + 1
                   const resourceCount = [lesson.classNotesUrl, lesson.assignmentPdfUrl].filter(Boolean).length
                   return (
-                    <motion.div className="admin-lesson" key={lesson.id || menuKey} whileHover={{ x: 3 }} transition={{ duration: .15 }}>
+                    <motion.div className="admin-lesson" key={lesson.id || menuKey}>
                       <span className="admin-lesson-number">{String(lessonNumber).padStart(2, '0')}</span>
                       <div className="admin-lesson-copy"><b>{lesson.title}</b><span className={lesson.videoUrl ? 'ready' : 'draft'}>{lesson.duration} · {lesson.videoUrl ? 'Video ready' : 'Video needed'} · {resourceCount} {resourceCount === 1 ? 'resource' : 'resources'}</span></div>
                       {lesson.active && <span className="current-chip">Open now</span>}
