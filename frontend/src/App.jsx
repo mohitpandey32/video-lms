@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { api } from './api'
 import {
   ArrowLeft, BookOpen, Check, ChevronDown, ChevronRight, Circle,
-  ClipboardList, ExternalLink, Eye, FileText, Gauge, GraduationCap, LayoutList,
+  ClipboardList, ExternalLink, Eye, FileText, Gauge, Github, GraduationCap, LayoutList,
   Link2, List, LockKeyhole, LogOut, Mail, Maximize, Menu, MoreHorizontal, Pause, PencilLine,
   Play, Plus, Settings2, ShieldCheck, SkipBack, SkipForward, Upload, UserRound,
   Trash2, VideoOff, Volume2, VolumeX, X,
@@ -187,7 +187,7 @@ function VideoModal({ lecture, onClose, onSave }) {
 }
 
 function NewLectureModal({ modules, initialModuleIndex = 0, onClose, onCreate }) {
-  const [form, setForm] = useState({ title: '', moduleIndex: String(initialModuleIndex), duration: '', videoUrl: '', classNotesUrl: '', assignmentPdfUrl: '' })
+  const [form, setForm] = useState({ title: '', moduleIndex: String(initialModuleIndex), duration: '', videoUrl: '', classNotesUrl: '', assignmentPdfUrl: '', githubRepoUrl: '' })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const update = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }))
@@ -217,6 +217,7 @@ function NewLectureModal({ modules, initialModuleIndex = 0, onClose, onCreate })
         <label>Public video URL <em>Required</em><input value={form.videoUrl} onChange={update('videoUrl')} placeholder="https://drive.google.com/file/d/…/view" /></label>
         <label>Class notes PDF URL <em>Optional</em><input value={form.classNotesUrl} onChange={update('classNotesUrl')} placeholder="https://drive.google.com/…/class-notes.pdf" /></label>
         <label>Assignment PDF URL <em>Optional</em><input value={form.assignmentPdfUrl} onChange={update('assignmentPdfUrl')} placeholder="https://drive.google.com/…/assignment.pdf" /></label>
+        <label>GitHub repository URL <em>Optional</em><input value={form.githubRepoUrl} onChange={update('githubRepoUrl')} placeholder="https://github.com/organization/repository" /></label>
         <div className="share-help"><Gauge /><span><b>Public access required:</b> set Drive files to “Anyone with the link.” Direct MP4, WebM, and PDF links are supported.</span></div>
         {error && <span className="form-error">{error}</span>}
         <div className="modal-actions"><button type="button" className="text-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={saving}>{saving ? 'Adding lecture…' : 'Add lecture'}</button></div>
@@ -230,6 +231,7 @@ function LectureResourcesModal({ lecture, onClose, onSave }) {
     videoUrl: lecture.videoUrl || '',
     classNotesUrl: lecture.classNotesUrl || '',
     assignmentPdfUrl: lecture.assignmentPdfUrl || '',
+    githubRepoUrl: lecture.githubRepoUrl || '',
   })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -254,7 +256,8 @@ function LectureResourcesModal({ lecture, onClose, onSave }) {
         <label>Public video URL<input autoFocus value={form.videoUrl} onChange={update('videoUrl')} placeholder="Google Drive, MP4, or WebM link" /></label>
         <label>Class notes PDF URL<input value={form.classNotesUrl} onChange={update('classNotesUrl')} placeholder="Public PDF or Google Drive link" /></label>
         <label>Assignment PDF URL<input value={form.assignmentPdfUrl} onChange={update('assignmentPdfUrl')} placeholder="Public PDF or Google Drive link" /></label>
-        <div className="share-help"><Gauge /><span>Leave an optional PDF field empty to remove that resource from the student lesson.</span></div>
+        <label>GitHub repository URL<input value={form.githubRepoUrl} onChange={update('githubRepoUrl')} placeholder="https://github.com/organization/repository" /></label>
+        <div className="share-help"><Gauge /><span>Leave an optional resource field empty to remove it from the student lesson.</span></div>
         {error && <span className="form-error">{error}</span>}
         <div className="modal-actions"><button type="button" className="text-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={saving}>{saving ? 'Saving resources…' : 'Save resources'}</button></div>
       </motion.form>
@@ -441,7 +444,7 @@ function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditM
                 {module.lessons.map((lesson, lectureIndex) => {
                   const menuKey = `${moduleIndex}:${lectureIndex}`
                   const lessonNumber = data.modules.slice(0, moduleIndex).reduce((total, item) => total + item.lessons.length, 0) + lectureIndex + 1
-                  const resourceCount = [lesson.classNotesUrl, lesson.assignmentPdfUrl].filter(Boolean).length
+                  const resourceCount = [lesson.classNotesUrl, lesson.assignmentPdfUrl, lesson.githubRepoUrl].filter(Boolean).length
                   return (
                     <motion.div className="admin-lesson" key={lesson.id || menuKey}>
                       <span className="admin-lesson-number">{String(lessonNumber).padStart(2, '0')}</span>
@@ -628,11 +631,13 @@ export default function App() {
           <div className="tabs" role="tablist">
             <button className={activeTab === 'notes' ? 'active' : ''} onClick={() => setActiveTab('notes')}><FileText /> Notes</button>
             <button className={activeTab === 'assignment' ? 'active' : ''} onClick={() => setActiveTab('assignment')}><BookOpen /> Assignment <span className="tab-count">1</span></button>
+            <button className={activeTab === 'repository' ? 'active' : ''} onClick={() => setActiveTab('repository')}><Github /> GitHub repo</button>
             <button className={activeTab === 'outline' ? 'active' : ''} onClick={() => setActiveTab('outline')}><List /> Lesson details</button>
           </div>
           <AnimatePresence mode="wait">
             {activeTab === 'notes' && <ResourceLinkPane key="notes" url={data.lecture.classNotesUrl} label="Open notes" />}
             {activeTab === 'assignment' && <ResourceLinkPane key="assignment" url={data.lecture.assignmentPdfUrl || data.assignments[0]?.submission} label="Open assignment" />}
+            {activeTab === 'repository' && <ResourceLinkPane key="repository" url={data.lecture.githubRepoUrl} label="Open GitHub repository" />}
             {activeTab === 'outline' && <motion.div key="outline" className="details-pane" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><div><span>In this lesson</span><h3>Turn raw conversations into evidence your team can use.</h3></div><ol><li><span>00:00</span>What counts as a signal</li><li><span>07:42</span>Separate behavior from opinion</li><li><span>18:10</span>Build the opportunity map</li></ol></motion.div>}
           </AnimatePresence>
         </section>

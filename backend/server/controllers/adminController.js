@@ -34,6 +34,7 @@ function synchronizeActiveLecture(course) {
     embedUrl: lecture.embedUrl || '',
     classNotesUrl: lecture.classNotesUrl || '',
     assignmentPdfUrl: lecture.assignmentPdfUrl || '',
+    githubRepoUrl: lecture.githubRepoUrl || '',
   }
 }
 
@@ -117,7 +118,8 @@ export async function updateLectureResources(req, res) {
   const videoUrl = String(req.body.videoUrl || '').trim()
   const classNotesUrl = String(req.body.classNotesUrl || '').trim()
   const assignmentPdfUrl = String(req.body.assignmentPdfUrl || '').trim()
-  if (![videoUrl, classNotesUrl, assignmentPdfUrl].every(isValidWebUrl)) {
+  const githubRepoUrl = String(req.body.githubRepoUrl || '').trim()
+  if (![videoUrl, classNotesUrl, assignmentPdfUrl, githubRepoUrl].every(isValidWebUrl)) {
     return res.status(400).json({ message: 'Use valid public HTTP or HTTPS links for all resources.' })
   }
 
@@ -130,6 +132,7 @@ export async function updateLectureResources(req, res) {
       embedUrl: videoUrl ? driveEmbedUrl(videoUrl) : '',
       classNotesUrl,
       assignmentPdfUrl,
+      githubRepoUrl,
     })
     if (lecture.active || (lecture.id && lecture.id === course.lecture.id)) {
       course.lecture = { ...course.lecture, ...lecture }
@@ -169,14 +172,14 @@ export async function updateActiveLecture(req, res) {
 }
 
 export async function createLecture(req, res) {
-  const { title, moduleIndex, duration, videoUrl, classNotesUrl = '', assignmentPdfUrl = '' } = req.body
+  const { title, moduleIndex, duration, videoUrl, classNotesUrl = '', assignmentPdfUrl = '', githubRepoUrl = '' } = req.body
   const targetModule = Number(moduleIndex)
   if (!title?.trim() || !videoUrl?.trim() || !duration?.trim()) {
     return res.status(400).json({ message: 'Title, duration, and a public video URL are required.' })
   }
 
   try {
-    if (![videoUrl, classNotesUrl, assignmentPdfUrl].every(isValidWebUrl)) {
+    if (![videoUrl, classNotesUrl, assignmentPdfUrl, githubRepoUrl].every(isValidWebUrl)) {
       throw new Error('invalid URL')
     }
     const course = await getCourse()
@@ -195,6 +198,7 @@ export async function createLecture(req, res) {
       embedUrl: driveEmbedUrl(videoUrl.trim()),
       classNotesUrl: String(classNotesUrl).trim(),
       assignmentPdfUrl: String(assignmentPdfUrl).trim(),
+      githubRepoUrl: String(githubRepoUrl).trim(),
       active: true,
       done: false,
     }

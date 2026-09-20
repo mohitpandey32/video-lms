@@ -75,6 +75,7 @@ export async function selectLecture(req, res) {
       embedUrl: selected.embedUrl || '',
       classNotesUrl: selected.classNotesUrl || '',
       assignmentPdfUrl: selected.assignmentPdfUrl || '',
+      githubRepoUrl: selected.githubRepoUrl || '',
     }
     await saveCourse(course)
     res.json(await applyUserProgress(course, req.user.id))
