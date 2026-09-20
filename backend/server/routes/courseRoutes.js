@@ -9,6 +9,7 @@ import {
   updateModule,
 } from '../controllers/adminController.js'
 import {
+  createVideoNote,
   saveNotes,
   selectLecture,
   selectLectureById,
@@ -24,6 +25,7 @@ const router = Router()
 router.use(requireAuth)
 
 router.get('/course', showCourse)
+router.post('/progress/notes/:lectureId', createVideoNote)
 router.put('/progress/playback/:lectureId', updatePlaybackPosition)
 router.put('/progress/:moduleIndex/:lectureIndex', updateProgress)
 router.put('/lectures/:id/select', selectLectureById)

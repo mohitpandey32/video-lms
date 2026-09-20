@@ -37,6 +37,27 @@ export async function removePlaybackPositionsForLecture(lectureId) {
   )
 }
 
+export async function addVideoNote(userId, lectureId, note) {
+  const field = `videoNotes.${lectureId}`
+  await (await progressCollection()).updateOne(
+    { userId },
+    {
+      $set: { userId, updatedAt: note.createdAt },
+      $push: { [field]: { $each: [note], $slice: -200 } },
+    },
+    { upsert: true },
+  )
+  return note
+}
+
+export async function removeVideoNotesForLecture(lectureId) {
+  if (!lectureId) return
+  await (await progressCollection()).updateMany(
+    { [`videoNotes.${lectureId}`]: { $exists: true } },
+    { $unset: { [`videoNotes.${lectureId}`]: '' } },
+  )
+}
+
 export function reindexCompletedLessonKeys(completed, deletedModuleIndex, deletedLectureIndex) {
   return [...new Set((completed || []).flatMap((key) => {
     const match = /^(\d+):(\d+)$/.exec(key)

@@ -25,6 +25,7 @@ export async function applyUserProgress(course, userId) {
   const progress = await getUserProgress(userId)
   const completed = new Set(progress?.completed || [])
   const playbackPositions = progress?.playbackPositions || {}
+  const videoNotes = progress?.videoNotes || {}
 
   course.modules.forEach((module, moduleIndex) => module.lessons.forEach((lesson, lectureIndex) => {
     lesson.done = completed.has(lessonKey(moduleIndex, lectureIndex))
@@ -37,6 +38,8 @@ export async function applyUserProgress(course, userId) {
   if (course.lecture) {
     course.lecture.resumeAt = Number(activePlayback?.seconds) || 0
     course.lecture.resumeUpdatedAt = activePlayback?.updatedAt || null
+    course.lecture.videoNotes = [...(videoNotes[course.lecture.id] || [])]
+      .sort((first, second) => first.seconds - second.seconds)
   }
 
   Object.assign(course.course, getProgressSummary(course, completed))

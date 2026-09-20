@@ -96,6 +96,17 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .resume-notice span { font-size: 10px; font-weight: 600; }
 .resume-notice button { height: 24px; padding: 0 9px; border: 0; border-radius: 12px; background: rgba(255,255,255,.1); color: var(--accent); font-size: 9px; font-weight: 600; cursor: pointer; }
 .resume-notice button:hover { background: rgba(255,255,255,.17); }
+.timestamp-note-editor { position: absolute; z-index: 6; right: 0; bottom: 78px; left: 0; width: min(430px, calc(100% - 28px)); margin: 0 auto; padding: 15px; border: 1px solid rgba(255,255,255,.16); background: rgba(20,21,18,.96); box-shadow: 0 18px 55px rgba(0,0,0,.4); backdrop-filter: blur(12px); }
+.timestamp-note-heading, .timestamp-note-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.timestamp-note-heading > span { display: flex; align-items: center; gap: 7px; color: #f2c94c; font-size: 10px; font-weight: 600; }
+.timestamp-note-heading svg { width: 13px; }
+.timestamp-note-heading > button { width: 26px; height: 26px; display: grid; place-items: center; border: 0; background: transparent; color: #8d8f88; cursor: pointer; }
+.timestamp-note-editor textarea { width: 100%; min-height: 88px; margin: 10px 0; padding: 11px; resize: vertical; border: 1px solid #454740; border-radius: 2px; background: #10110f; color: white; font: 12px/1.55 Inter, sans-serif; outline: 0; }
+.timestamp-note-editor textarea:focus { border-color: #f2c94c; }
+.timestamp-note-actions > span { color: #777970; font-size: 9px; }
+.timestamp-note-actions > span.note-error { color: #e98980; }
+.save-note-button { height: 32px; padding: 0 13px; border: 0; border-radius: 2px; background: #f2c94c; color: #171814; font-size: 10px; font-weight: 700; cursor: pointer; }
+.save-note-button:disabled { opacity: .55; cursor: wait; }
 .player--empty { display: flex; align-items: center; justify-content: center; gap: 16px; color: white; background: radial-gradient(circle at 50% 45%, #22231f 0, #10110f 52%, #080907 100%); }
 .player--empty > span { width: 52px; height: 52px; display: grid; place-items: center; border: 1px solid #454740; border-radius: 50%; color: var(--accent); }
 .player--empty > span svg { width: 20px; }
@@ -110,14 +121,28 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .center-play svg { width: 25px; }
 .controls { position: absolute; inset: auto 0 0; padding: 26px 22px 15px; background: linear-gradient(transparent, rgba(0,0,0,.8)); transition: opacity .22s ease, transform .22s ease; }
 .player.controls-hidden .controls { opacity: 0; transform: translateY(8px); pointer-events: none; }
-.timeline { width: 100%; appearance: none; height: 3px; background: linear-gradient(to right, var(--accent) var(--played), rgba(255,255,255,.35) var(--played)); cursor: pointer; display: block; }
+.timeline-shell { position: relative; height: 14px; display: flex; align-items: center; }
+.timeline { position: relative; z-index: 1; width: 100%; appearance: none; height: 3px; background: linear-gradient(to right, var(--accent) var(--played), rgba(255,255,255,.35) var(--played)); cursor: pointer; display: block; }
 .timeline::-webkit-slider-thumb { appearance: none; width: 11px; height: 11px; border-radius: 50%; background: var(--accent); }
+.note-markers { position: absolute; z-index: 2; inset: 0; pointer-events: none; }
+.note-marker { position: absolute; top: 1px; width: 9px; height: 13px; padding: 0; border: 0; background: transparent; transform: translateX(-50%); pointer-events: auto; cursor: pointer; }
+.note-marker > i { width: 3px; height: 12px; display: block; margin: 0 auto; border-radius: 2px; background: #f2c94c; box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
+.note-marker > span { position: absolute; left: 50%; bottom: 20px; width: max-content; max-width: 260px; padding: 9px 11px; display: flex; flex-direction: column; gap: 4px; border: 1px solid #494b44; background: #20211d; color: #e5e6e1; box-shadow: 0 10px 30px rgba(0,0,0,.38); font: 10px/1.45 Inter, sans-serif; text-align: left; white-space: normal; transform: translate(-50%, 5px); opacity: 0; visibility: hidden; transition: opacity .14s ease, transform .14s ease; }
+.note-marker > span b { color: #f2c94c; font-size: 9px; }
+.note-marker:hover > span, .note-marker:focus-visible > span { opacity: 1; visibility: visible; transform: translate(-50%, 0); }
+.note-marker.near-start > span { left: 0; transform: translate(0, 5px); }
+.note-marker.near-start:hover > span, .note-marker.near-start:focus-visible > span { transform: translate(0, 0); }
+.note-marker.near-end > span { right: 0; left: auto; transform: translate(0, 5px); }
+.note-marker.near-end:hover > span, .note-marker.near-end:focus-visible > span { transform: translate(0, 0); }
 .control-row, .control-cluster { display: flex; align-items: center; }
 .control-row { justify-content: space-between; margin-top: 9px; }
 .control-cluster { gap: 4px; }
 .control-cluster button { height: 28px; min-width: 28px; padding: 0 7px; border: 0; background: none; color: white; display: grid; place-items: center; font-size: 10px; cursor: pointer; border-radius: 4px; }
 .control-cluster button:hover { background: rgba(255,255,255,.13); }
+.control-cluster button:disabled { opacity: .4; cursor: not-allowed; }
 .control-cluster svg { width: 15px; }
+.control-cluster .add-note-control { display: flex; gap: 6px; padding: 0 9px; color: #f2c94c; }
+.add-note-control span { font-size: 9px; font-weight: 600; }
 .volume { width: 58px; height: 2px; accent-color: white; }
 .time { color: #bbbdb7; font-size: 10px; margin-left: 8px; }
 .time i { color: #656760; font-style: normal; }

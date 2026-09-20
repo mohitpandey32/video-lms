@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import { getCourse, saveCourse } from '../models/courseModel.js'
-import { getUserProgress, savePlaybackPosition, saveUserProgress } from '../models/progressModel.js'
+import { addVideoNote, getUserProgress, savePlaybackPosition, saveUserProgress } from '../models/progressModel.js'
 import { applyUserProgress, getProgressSummary, lessonKey } from '../services/courseService.js'
 import { isValidWebUrl } from '../utils/url.js'
 
@@ -58,6 +59,34 @@ export async function updatePlaybackPosition(req, res) {
     res.json(await savePlaybackPosition(req.user.id, lectureId, resumableSeconds, clampedDuration))
   } catch {
     res.status(500).json({ message: 'Could not save the playback position.' })
+  }
+}
+
+export async function createVideoNote(req, res) {
+  const lectureId = String(req.params.lectureId || '')
+  const text = String(req.body.text || '').trim()
+  const seconds = Number(req.body.seconds)
+
+  if (!/^[a-zA-Z0-9_-]{1,160}$/.test(lectureId)
+    || !text || text.length > 1000
+    || !Number.isFinite(seconds) || seconds < 0 || seconds > 24 * 60 * 60) {
+    return res.status(400).json({ message: 'Enter a note of 1,000 characters or fewer at a valid timestamp.' })
+  }
+
+  try {
+    const course = await getCourse()
+    const lectureExists = course.modules.some((module) => module.lessons.some((lecture) => lecture.id === lectureId))
+    if (!lectureExists) return res.status(404).json({ message: 'Lecture not found.' })
+
+    const note = {
+      id: `note-${randomUUID()}`,
+      seconds: Math.round(seconds * 10) / 10,
+      text,
+      createdAt: new Date().toISOString(),
+    }
+    res.status(201).json(await addVideoNote(req.user.id, lectureId, note))
+  } catch {
+    res.status(500).json({ message: 'Could not save the timestamped note.' })
   }
 }
 

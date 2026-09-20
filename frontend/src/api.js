@@ -81,4 +81,8 @@ export const api = {
     `/api/progress/playback/${encodeURIComponent(lectureId)}`,
     { method: 'PUT', body: json(payload), keepalive: options.keepalive === true },
   ),
+  createVideoNote: (lectureId, payload) => request(
+    `/api/progress/notes/${encodeURIComponent(lectureId)}`,
+    { method: 'POST', body: json(payload) },
+  ),
 }

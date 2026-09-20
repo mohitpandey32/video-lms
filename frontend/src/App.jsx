@@ -6,7 +6,7 @@ import {
   ClipboardList, ExternalLink, Eye, FileText, Gauge, Github, GraduationCap, GripVertical, LayoutList,
   Link2, List, LockKeyhole, LogOut, Mail, Maximize, Menu, Minimize, MoreHorizontal, Pause, PencilLine,
   Play, Plus, Settings2, ShieldCheck, SkipBack, SkipForward, Upload, UserRound,
-  Trash2, VideoOff, Volume2, VolumeX, X,
+  StickyNote, Trash2, VideoOff, Volume2, VolumeX, X,
 } from 'lucide-react'
 
 function formatTime(value) {
@@ -27,6 +27,7 @@ function Player({ lecture, userId, onComplete }) {
   const playerRef = useRef(null)
   const controlsTimerRef = useRef(null)
   const resumeNoticeTimerRef = useRef(null)
+  const controlsHoverRef = useRef(false)
   const lastLocalSecondRef = useRef(0)
   const lastServerSecondRef = useRef(Number(lecture.resumeAt) || 0)
   const restoringPositionRef = useRef(false)
@@ -40,15 +41,21 @@ function Player({ lecture, userId, onComplete }) {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [videoAspect, setVideoAspect] = useState('16 / 9')
   const [resumeNotice, setResumeNotice] = useState(null)
+  const [videoNotes, setVideoNotes] = useState(() => lecture.videoNotes || [])
+  const [noteTimestamp, setNoteTimestamp] = useState(null)
+  const [noteText, setNoteText] = useState('')
+  const [noteSaving, setNoteSaving] = useState(false)
+  const [noteError, setNoteError] = useState('')
   const drive = isDriveUrl(lecture.videoUrl)
   const playbackStorageKey = lecture.id && userId ? `arcwell:playback:${userId}:${lecture.id}` : ''
 
   useEffect(() => {
     setPlaying(false); setCurrent(0); setDuration(0); setControlsVisible(true); setVideoAspect('16 / 9'); setResumeNotice(null)
+    setVideoNotes(lecture.videoNotes || []); setNoteTimestamp(null); setNoteText(''); setNoteError('')
     lastLocalSecondRef.current = 0
     lastServerSecondRef.current = Number(lecture.resumeAt) || 0
     restoringPositionRef.current = false
-  }, [lecture.videoUrl])
+  }, [lecture.id, lecture.videoUrl])
 
   const normalizePlaybackPosition = (seconds, mediaDuration) => {
     if (!Number.isFinite(seconds) || !Number.isFinite(mediaDuration) || mediaDuration <= 0) return 0
@@ -97,6 +104,52 @@ function Player({ lecture, userId, onComplete }) {
     syncPlaybackPosition({ force: true, seconds: 0 })
   }
 
+  const openNoteEditor = () => {
+    const video = videoRef.current
+    if (!video || !lecture.id) return
+    video.pause()
+    setNoteTimestamp(video.currentTime)
+    setNoteText('')
+    setNoteError('')
+    setControlsVisible(true)
+  }
+
+  const closeNoteEditor = () => {
+    if (noteSaving) return
+    setNoteTimestamp(null)
+    setNoteText('')
+    setNoteError('')
+  }
+
+  const saveTimestampedNote = async (event) => {
+    event.preventDefault()
+    const text = noteText.trim()
+    if (!text) {
+      setNoteError('Write a note before saving.')
+      return
+    }
+    try {
+      setNoteSaving(true)
+      setNoteError('')
+      const note = await api.createVideoNote(lecture.id, { seconds: noteTimestamp, text })
+      setVideoNotes((currentNotes) => [...currentNotes, note].sort((first, second) => first.seconds - second.seconds))
+      setNoteTimestamp(null)
+      setNoteText('')
+    } catch (error) {
+      setNoteError(error.message)
+    } finally {
+      setNoteSaving(false)
+    }
+  }
+
+  const seekToNote = (seconds) => {
+    if (!videoRef.current) return
+    videoRef.current.currentTime = seconds
+    setCurrent(seconds)
+    syncPlaybackPosition({ force: true, seconds })
+    revealControls()
+  }
+
   useEffect(() => {
     const syncFullscreen = () => {
       const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement
@@ -115,7 +168,9 @@ function Player({ lecture, userId, onComplete }) {
     setControlsVisible(true)
     window.clearTimeout(controlsTimerRef.current)
     if (playing && !showSpeed) {
-      controlsTimerRef.current = window.setTimeout(() => setControlsVisible(false), 2200)
+      controlsTimerRef.current = window.setTimeout(() => {
+        if (!controlsHoverRef.current && !document.activeElement?.classList?.contains('note-marker')) setControlsVisible(false)
+      }, 2200)
     }
   }
 
@@ -251,15 +306,27 @@ function Player({ lecture, userId, onComplete }) {
         }}
       />
       <AnimatePresence>{resumeNotice !== null && <motion.div className="resume-notice" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}><span>Resumed at {formatTime(resumeNotice)}</span><button onClick={clearPlaybackPosition}>Start over</button></motion.div>}</AnimatePresence>
+      <AnimatePresence>{noteTimestamp !== null && <motion.form className="timestamp-note-editor" initial={{ opacity: 0, y: 10, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: .98 }} onSubmit={saveTimestampedNote} onDoubleClick={(event) => event.stopPropagation()}>
+        <div className="timestamp-note-heading"><span><StickyNote /> Note at {formatTime(noteTimestamp)}</span><button type="button" onClick={closeNoteEditor} aria-label="Close note editor"><X /></button></div>
+        <textarea autoFocus maxLength="1000" value={noteText} onChange={(event) => setNoteText(event.target.value)} placeholder="Add a reminder, question, or key idea…" />
+        <div className="timestamp-note-actions"><span className={noteError ? 'note-error' : ''}>{noteError || `${noteText.length}/1000`}</span><button className="save-note-button" disabled={noteSaving}>{noteSaving ? 'Saving…' : 'Save note'}</button></div>
+      </motion.form>}</AnimatePresence>
       <button className="center-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}>
         {playing ? <Pause fill="currentColor" /> : <Play fill="currentColor" />}
       </button>
-      <div className="controls">
-        <input className="timeline" type="range" min="0" max={duration || 0} value={current} step="0.1"
-          style={{ '--played': `${duration ? (current / duration) * 100 : 0}%` }}
-          onChange={(event) => { const next = Number(event.target.value); videoRef.current.currentTime = next; setCurrent(next) }}
-          onPointerUp={() => syncPlaybackPosition({ force: true })}
-          onKeyUp={() => syncPlaybackPosition({ force: true })} />
+      <div className="controls" onPointerEnter={() => { controlsHoverRef.current = true; window.clearTimeout(controlsTimerRef.current) }} onPointerLeave={() => { controlsHoverRef.current = false; revealControls() }}>
+        <div className="timeline-shell">
+          <input className="timeline" type="range" min="0" max={duration || 0} value={current} step="0.1"
+            style={{ '--played': `${duration ? (current / duration) * 100 : 0}%` }}
+            onChange={(event) => { const next = Number(event.target.value); videoRef.current.currentTime = next; setCurrent(next) }}
+            onPointerUp={() => syncPlaybackPosition({ force: true })}
+            onKeyUp={() => syncPlaybackPosition({ force: true })} />
+          <div className="note-markers">{duration > 0 && videoNotes.map((note) => {
+            const position = Math.min(100, Math.max(0, (note.seconds / duration) * 100))
+            const edgeClass = position < 12 ? 'near-start' : position > 88 ? 'near-end' : ''
+            return <button type="button" className={`note-marker ${edgeClass}`} key={note.id} style={{ left: `${position}%` }} onClick={() => seekToNote(note.seconds)} aria-label={`Note at ${formatTime(note.seconds)}: ${note.text}`}><i /><span><b>{formatTime(note.seconds)}</b>{note.text}</span></button>
+          })}</div>
+        </div>
         <div className="control-row">
           <div className="control-cluster">
             <button onClick={() => jump(-10)} aria-label="Back 10 seconds"><SkipBack /></button>
@@ -268,6 +335,7 @@ function Player({ lecture, userId, onComplete }) {
             <button onClick={() => changeVolume(volume ? 0 : 0.8)} aria-label="Mute">{volume ? <Volume2 /> : <VolumeX />}</button>
             <input className="volume" type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => changeVolume(Number(e.target.value))} />
             <span className="time">{formatTime(current)} <i>/</i> {formatTime(duration)}</span>
+            <button className="add-note-control" onClick={openNoteEditor} disabled={!lecture.id} aria-label="Add note at current time" title="Add timestamped note"><StickyNote /><span>Note</span></button>
           </div>
           <div className="control-cluster">
             <div className="speed-menu">
