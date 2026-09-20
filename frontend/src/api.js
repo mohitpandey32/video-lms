@@ -69,6 +69,10 @@ export const api = {
     `/api/modules/${moduleIndex}/lectures/${lectureIndex}`,
     { method: 'DELETE' },
   ),
+  reorderLecture: (payload) => request('/api/lectures/reorder', {
+    method: 'PUT',
+    body: json(payload),
+  }),
   updateProgress: (moduleIndex, lectureIndex, completed) => request(
     `/api/progress/${moduleIndex}/${lectureIndex}`,
     { method: 'PUT', body: json({ completed }) },

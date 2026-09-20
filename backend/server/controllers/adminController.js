@@ -1,5 +1,6 @@
 import { getCourse, saveCourse } from '../models/courseModel.js'
-import { reindexProgressAfterLectureDelete } from '../models/progressModel.js'
+import { randomUUID } from 'node:crypto'
+import { reindexProgressAfterLectureDelete, remapProgressAfterLectureMove } from '../models/progressModel.js'
 import { applyUserProgress } from '../services/courseService.js'
 import { driveEmbedUrl, isValidWebUrl } from '../utils/url.js'
 
@@ -109,6 +110,51 @@ export async function deleteLecture(req, res) {
   } catch (error) {
     console.error('Could not delete lecture:', error)
     res.status(500).json({ message: 'Could not delete the lecture.' })
+  }
+}
+
+export async function reorderLecture(req, res) {
+  const fromModuleIndex = Number(req.body.fromModuleIndex)
+  const fromLectureIndex = Number(req.body.fromLectureIndex)
+  const toModuleIndex = Number(req.body.toModuleIndex)
+  const toLectureIndex = Number(req.body.toLectureIndex)
+
+  try {
+    const course = await getCourse()
+    const sourceModule = course.modules[fromModuleIndex]
+    const targetModule = course.modules[toModuleIndex]
+    const indicesAreValid = [fromModuleIndex, fromLectureIndex, toModuleIndex, toLectureIndex]
+      .every(Number.isInteger)
+
+    if (!indicesAreValid || !sourceModule?.lessons?.[fromLectureIndex] || !targetModule
+      || toLectureIndex < 0 || toLectureIndex > targetModule.lessons.length) {
+      return res.status(400).json({ message: 'Choose a valid lecture position.' })
+    }
+
+    const previousKeysById = new Map()
+    course.modules.forEach((module, moduleIndex) => module.lessons.forEach((lecture, lectureIndex) => {
+      if (!lecture.id) lecture.id = `lecture-${randomUUID()}`
+      previousKeysById.set(lecture.id, `${moduleIndex}:${lectureIndex}`)
+    }))
+
+    const [lecture] = sourceModule.lessons.splice(fromLectureIndex, 1)
+    const insertionIndex = fromModuleIndex === toModuleIndex && fromLectureIndex < toLectureIndex
+      ? toLectureIndex - 1
+      : toLectureIndex
+    targetModule.lessons.splice(insertionIndex, 0, lecture)
+
+    synchronizeActiveLecture(course)
+    const keyMap = {}
+    course.modules.forEach((module, moduleIndex) => module.lessons.forEach((item, lectureIndex) => {
+      keyMap[previousKeysById.get(item.id)] = `${moduleIndex}:${lectureIndex}`
+    }))
+
+    await saveCourse(course)
+    await remapProgressAfterLectureMove(keyMap)
+    res.json(await applyUserProgress(course, req.user.id))
+  } catch (error) {
+    console.error('Could not reorder lecture:', error)
+    res.status(500).json({ message: 'Could not move the lecture.' })
   }
 }
 

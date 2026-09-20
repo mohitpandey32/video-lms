@@ -45,3 +45,25 @@ export async function reindexProgressAfterLectureDelete(moduleIndex, lectureInde
     },
   })))
 }
+
+export function remapCompletedLessonKeys(completed, keyMap) {
+  return [...new Set((completed || []).map((key) => keyMap[key] || key))]
+}
+
+export async function remapProgressAfterLectureMove(keyMap) {
+  const collection = await progressCollection()
+  const records = await collection.find({ completed: { $exists: true } }).toArray()
+  if (!records.length) return
+
+  await collection.bulkWrite(records.map((record) => ({
+    updateOne: {
+      filter: { _id: record._id },
+      update: {
+        $set: {
+          completed: remapCompletedLessonKeys(record.completed, keyMap),
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    },
+  })))
+}

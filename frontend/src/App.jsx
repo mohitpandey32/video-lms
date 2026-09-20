@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { api } from './api'
 import {
   ArrowLeft, BookOpen, Check, ChevronDown, ChevronRight, Circle,
-  ClipboardList, ExternalLink, Eye, FileText, Gauge, Github, GraduationCap, LayoutList,
+  ClipboardList, ExternalLink, Eye, FileText, Gauge, Github, GraduationCap, GripVertical, LayoutList,
   Link2, List, LockKeyhole, LogOut, Mail, Maximize, Menu, MoreHorizontal, Pause, PencilLine,
   Play, Plus, Settings2, ShieldCheck, SkipBack, SkipForward, Upload, UserRound,
   Trash2, VideoOff, Volume2, VolumeX, X,
@@ -398,11 +398,15 @@ function AuthScreen({ onAuthenticate }) {
   )
 }
 
-function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditModule, onEditLecture, onEditResources, onDeleteLecture }) {
+function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditModule, onEditLecture, onEditResources, onDeleteLecture, onMoveLecture }) {
   const [openMenu, setOpenMenu] = useState(null)
+  const [draggedLecture, setDraggedLecture] = useState(null)
+  const [dropTarget, setDropTarget] = useState(null)
+  const [reordering, setReordering] = useState(false)
+  const [reorderError, setReorderError] = useState('')
   const lessonCount = data.modules.reduce((total, module) => total + module.lessons.length, 0)
   const videoCount = data.modules.reduce((total, module) => total + module.lessons.filter((lesson) => lesson.videoUrl).length, 0)
-  const pdfCount = data.modules.reduce((total, module) => total + module.lessons.filter((lesson) => lesson.classNotesUrl || lesson.assignmentPdfUrl).length, 0)
+  const resourceCount = data.modules.reduce((total, module) => total + module.lessons.filter((lesson) => lesson.classNotesUrl || lesson.assignmentPdfUrl || lesson.githubRepoUrl).length, 0)
 
   useEffect(() => {
     if (!openMenu) return undefined
@@ -422,6 +426,61 @@ function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditM
     action()
   }
 
+  const startDragging = (event, moduleIndex, lectureIndex) => {
+    const source = { moduleIndex, lectureIndex }
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', JSON.stringify(source))
+    setDraggedLecture(source)
+    setDropTarget(null)
+    setReorderError('')
+    setOpenMenu(null)
+  }
+
+  const updateDropTarget = (event, moduleIndex, lectureIndex) => {
+    if (!draggedLecture || reordering) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const position = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after'
+    setDropTarget((current) => current?.moduleIndex === moduleIndex && current?.lectureIndex === lectureIndex && current?.position === position
+      ? current
+      : { moduleIndex, lectureIndex, position })
+  }
+
+  const finishDragging = () => {
+    setDraggedLecture(null)
+    setDropTarget(null)
+  }
+
+  const dropLecture = async (event, moduleIndex, lectureIndex, position = 'before') => {
+    event.preventDefault()
+    if (!draggedLecture || reordering) return
+    const toLectureIndex = lectureIndex + (position === 'after' ? 1 : 0)
+    const normalizedIndex = draggedLecture.moduleIndex === moduleIndex && draggedLecture.lectureIndex < toLectureIndex
+      ? toLectureIndex - 1
+      : toLectureIndex
+    if (draggedLecture.moduleIndex === moduleIndex && draggedLecture.lectureIndex === normalizedIndex) {
+      finishDragging()
+      return
+    }
+
+    try {
+      setReordering(true)
+      setReorderError('')
+      await onMoveLecture({
+        fromModuleIndex: draggedLecture.moduleIndex,
+        fromLectureIndex: draggedLecture.lectureIndex,
+        toModuleIndex: moduleIndex,
+        toLectureIndex,
+      })
+    } catch (error) {
+      setReorderError(error.message)
+    } finally {
+      setReordering(false)
+      finishDragging()
+    }
+  }
+
   return (
     <div className="admin-shell">
       <aside className="admin-sidebar">
@@ -431,9 +490,10 @@ function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditM
       </aside>
       <main className="admin-main">
         <header className="admin-header"><div><span className="overline">COURSE CONTENT</span><h1>{data.course.title}</h1><p>Manage the lesson sequence, video sources, notes, and assignments.</p></div><button className="primary-button admin-add" onClick={() => onNewLecture(0)}><Plus /> New lecture</button></header>
-        <dl className="admin-metrics"><div><dt>Modules</dt><dd>{String(data.modules.length).padStart(2, '0')}</dd></div><div><dt>Lectures</dt><dd>{String(lessonCount).padStart(2, '0')}</dd></div><div><dt>Video ready</dt><dd>{String(videoCount).padStart(2, '0')}</dd></div><div><dt>With resources</dt><dd>{String(pdfCount).padStart(2, '0')}</dd></div></dl>
+        <dl className="admin-metrics"><div><dt>Modules</dt><dd>{String(data.modules.length).padStart(2, '0')}</dd></div><div><dt>Lectures</dt><dd>{String(lessonCount).padStart(2, '0')}</dd></div><div><dt>Video ready</dt><dd>{String(videoCount).padStart(2, '0')}</dd></div><div><dt>With resources</dt><dd>{String(resourceCount).padStart(2, '0')}</dd></div></dl>
         <section className="admin-content">
-          <div className="admin-section-heading"><div><h2>Course outline</h2><p>Lectures appear to students in this order.</p></div><span>{lessonCount} total</span></div>
+          <div className="admin-section-heading"><div><h2>Course outline</h2><p>Drag a lecture by its handle to change its position or module.</p></div><span>{reordering ? 'Saving order…' : `${lessonCount} total`}</span></div>
+          {reorderError && <p className="admin-reorder-error" role="alert">{reorderError}</p>}
           {data.modules.map((module, moduleIndex) => (
             <motion.section className="admin-module" key={moduleIndex} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: moduleIndex * .05 }}>
               <header>
@@ -446,7 +506,14 @@ function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditM
                   const lessonNumber = data.modules.slice(0, moduleIndex).reduce((total, item) => total + item.lessons.length, 0) + lectureIndex + 1
                   const resourceCount = [lesson.classNotesUrl, lesson.assignmentPdfUrl, lesson.githubRepoUrl].filter(Boolean).length
                   return (
-                    <motion.div className="admin-lesson" key={lesson.id || menuKey}>
+                    <motion.div
+                      layout="position"
+                      className={`admin-lesson ${draggedLecture?.moduleIndex === moduleIndex && draggedLecture?.lectureIndex === lectureIndex ? 'dragging' : ''} ${dropTarget?.moduleIndex === moduleIndex && dropTarget?.lectureIndex === lectureIndex ? `drop-${dropTarget.position}` : ''}`}
+                      key={lesson.id || menuKey}
+                      onDragOver={(event) => updateDropTarget(event, moduleIndex, lectureIndex)}
+                      onDrop={(event) => { const bounds = event.currentTarget.getBoundingClientRect(); dropLecture(event, moduleIndex, lectureIndex, event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after') }}
+                    >
+                      <button className="drag-handle" draggable={!reordering} onDragStart={(event) => startDragging(event, moduleIndex, lectureIndex)} onDragEnd={finishDragging} aria-label={`Move ${lesson.title}`} title="Drag to reorder"><GripVertical /></button>
                       <span className="admin-lesson-number">{String(lessonNumber).padStart(2, '0')}</span>
                       <div className="admin-lesson-copy"><b>{lesson.title}</b><span className={lesson.videoUrl ? 'ready' : 'draft'}>{lesson.duration} · {lesson.videoUrl ? 'Video ready' : 'Video needed'} · {resourceCount} {resourceCount === 1 ? 'resource' : 'resources'}</span></div>
                       {lesson.active && <span className="current-chip">Open now</span>}
@@ -462,7 +529,7 @@ function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditM
                     </motion.div>
                   )
                 })}
-                {!module.lessons.length && <div className="admin-empty-module"><span>No lectures in this module</span><button onClick={() => onNewLecture(moduleIndex)}><Plus /> Add the first lecture</button></div>}
+                {!module.lessons.length && <div className={`admin-empty-module ${dropTarget?.moduleIndex === moduleIndex ? 'drop-target' : ''}`} onDragOver={(event) => { if (draggedLecture && !reordering) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDropTarget((current) => current?.moduleIndex === moduleIndex && current?.lectureIndex === 0 ? current : { moduleIndex, lectureIndex: 0, position: 'before' }) } }} onDrop={(event) => dropLecture(event, moduleIndex, 0)}><span>{draggedLecture ? 'Drop lecture in this module' : 'No lectures in this module'}</span><button onClick={() => onNewLecture(moduleIndex)}><Plus /> Add the first lecture</button></div>}
               </div>
             </motion.section>
           ))}
@@ -560,6 +627,11 @@ export default function App() {
     setActiveTab('notes')
   }
 
+  const moveLecture = async (payload) => {
+    const updated = await api.reorderLecture(payload)
+    setData(updated)
+  }
+
   if (!authReady) return <main className="load-state"><div className="brand-mark pulse">A</div><span>Checking your session…</span></main>
   if (error) return <main className="load-state"><div className="brand-mark">A</div><h1>Arcwell is offline</h1><p>{error}</p><button className="primary-button" onClick={logout}>Log out</button></main>
   if (!user) return <AuthScreen onAuthenticate={authenticate} />
@@ -596,7 +668,7 @@ export default function App() {
   if (canEdit && !adminPreview) {
     return (
       <>
-        <AdminDashboard data={data} user={user} onPreview={() => setAdminPreview(true)} onLogout={logout} onNewLecture={(moduleIndex) => setNewLectureModuleIndex(moduleIndex)} onEditModule={(index, title) => setEditingModule({ index, title })} onEditLecture={(moduleIndex, lectureIndex, title) => setEditingLecture({ moduleIndex, lectureIndex, title })} onEditResources={(moduleIndex, lectureIndex, lecture) => setEditingResources({ moduleIndex, lectureIndex, ...lecture })} onDeleteLecture={(moduleIndex, lectureIndex, lecture) => setDeletingLecture({ moduleIndex, lectureIndex, title: lecture.title })} />
+        <AdminDashboard data={data} user={user} onPreview={() => setAdminPreview(true)} onLogout={logout} onNewLecture={(moduleIndex) => setNewLectureModuleIndex(moduleIndex)} onEditModule={(index, title) => setEditingModule({ index, title })} onEditLecture={(moduleIndex, lectureIndex, title) => setEditingLecture({ moduleIndex, lectureIndex, title })} onEditResources={(moduleIndex, lectureIndex, lecture) => setEditingResources({ moduleIndex, lectureIndex, ...lecture })} onDeleteLecture={(moduleIndex, lectureIndex, lecture) => setDeletingLecture({ moduleIndex, lectureIndex, title: lecture.title })} onMoveLecture={moveLecture} />
         <AnimatePresence>{newLectureModuleIndex !== null && <NewLectureModal modules={data.modules} initialModuleIndex={newLectureModuleIndex} onClose={() => setNewLectureModuleIndex(null)} onCreate={createLecture} />}</AnimatePresence>
         <AnimatePresence>{editingModule && <EditModuleModal module={editingModule} onClose={() => setEditingModule(null)} onSave={updateModule} />}</AnimatePresence>
         <AnimatePresence>{editingLecture && <EditLectureModal lecture={editingLecture} onClose={() => setEditingLecture(null)} onSave={updateLectureName} />}</AnimatePresence>
