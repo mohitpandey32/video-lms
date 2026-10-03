@@ -4,6 +4,24 @@ import { reindexProgressAfterLectureDelete, remapProgressAfterLectureMove, remov
 import { applyUserProgress } from '../services/courseService.js'
 import { driveEmbedUrl, isValidWebUrl } from '../utils/url.js'
 
+const qualityLevels = ['360p', '480p', '720p', '1080p']
+
+function normalizeVideoQualities(input) {
+  if (input == null) return {}
+  if (typeof input !== 'object' || Array.isArray(input)) throw new Error('invalid quality sources')
+  const qualities = {}
+  for (const level of qualityLevels) {
+    const value = input[level]
+    if (value != null && typeof value !== 'string') throw new Error('invalid quality source')
+    const url = (value || '').trim()
+    if (url) {
+      if (!isValidWebUrl(url)) throw new Error('invalid quality source')
+      qualities[level] = url
+    }
+  }
+  return qualities
+}
+
 function synchronizeActiveLecture(course) {
   let selectedModuleIndex = -1
   let selectedLectureIndex = -1
@@ -172,6 +190,16 @@ export async function updateLectureResources(req, res) {
     return res.status(400).json({ message: 'Use valid public HTTP or HTTPS links for all resources.' })
   }
 
+  let videoQualities
+  try {
+    videoQualities = normalizeVideoQualities(req.body.videoQualities)
+  } catch {
+    return res.status(400).json({ message: 'Use valid public HTTP or HTTPS links for quality options.' })
+  }
+  if (!videoUrl && Object.keys(videoQualities).length) {
+    return res.status(400).json({ message: 'Add a primary video URL before quality options.' })
+  }
+
   try {
     const course = await getCourse()
     const lecture = course.modules[moduleIndex]?.lessons?.[lectureIndex]
@@ -179,6 +207,7 @@ export async function updateLectureResources(req, res) {
     Object.assign(lecture, {
       videoUrl,
       embedUrl: videoUrl ? driveEmbedUrl(videoUrl) : '',
+      videoQualities,
       classNotesUrl,
       assignmentPdfUrl,
       githubRepoUrl,
@@ -202,11 +231,15 @@ export async function updateActiveLecture(req, res) {
   try {
     if (!isValidWebUrl(videoUrl)) throw new Error('invalid URL')
     const course = await getCourse()
+    const videoQualities = req.body.videoQualities === undefined
+      ? course.lecture.videoQualities || {}
+      : normalizeVideoQualities(req.body.videoQualities)
     course.lecture = {
       ...course.lecture,
       title: title.trim(),
       videoUrl: videoUrl.trim(),
       embedUrl: driveEmbedUrl(videoUrl.trim()),
+      videoQualities,
     }
     if (course.lecture.id) {
       course.modules.forEach((module) => module.lessons.forEach((lesson) => {
@@ -231,6 +264,7 @@ export async function createLecture(req, res) {
     if (![videoUrl, classNotesUrl, assignmentPdfUrl, githubRepoUrl].every(isValidWebUrl)) {
       throw new Error('invalid URL')
     }
+    const videoQualities = normalizeVideoQualities(req.body.videoQualities)
     const course = await getCourse()
     if (!Number.isInteger(targetModule) || !course.modules[targetModule]) {
       return res.status(400).json({ message: 'Choose a valid course module.' })
@@ -245,6 +279,7 @@ export async function createLecture(req, res) {
       duration: duration.trim(),
       videoUrl: videoUrl.trim(),
       embedUrl: driveEmbedUrl(videoUrl.trim()),
+      videoQualities,
       classNotesUrl: String(classNotesUrl).trim(),
       assignmentPdfUrl: String(assignmentPdfUrl).trim(),
       githubRepoUrl: String(githubRepoUrl).trim(),
