@@ -58,6 +58,25 @@ export async function removeVideoNotesForLecture(lectureId) {
   )
 }
 
+export async function saveSelfNotes(userId, lectureId, text) {
+  const updatedAt = new Date().toISOString()
+  const note = { text, updatedAt }
+  await (await progressCollection()).updateOne(
+    { userId },
+    { $set: { userId, [`selfNotes.${lectureId}`]: note, updatedAt } },
+    { upsert: true },
+  )
+  return note
+}
+
+export async function removeSelfNotesForLecture(lectureId) {
+  if (!lectureId) return
+  await (await progressCollection()).updateMany(
+    { [`selfNotes.${lectureId}`]: { $exists: true } },
+    { $unset: { [`selfNotes.${lectureId}`]: '' } },
+  )
+}
+
 export function reindexCompletedLessonKeys(completed, deletedModuleIndex, deletedLectureIndex) {
   return [...new Set((completed || []).flatMap((key) => {
     const match = /^(\d+):(\d+)$/.exec(key)

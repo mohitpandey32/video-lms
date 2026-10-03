@@ -4,7 +4,7 @@ import { api } from './api'
 import {
   ArrowLeft, BookOpen, Check, ChevronDown, ChevronRight, Circle,
   ClipboardList, ExternalLink, Eye, FileText, Gauge, Github, GraduationCap, GripVertical, LayoutList,
-  Link2, List, LockKeyhole, LogOut, Mail, Maximize, Menu, Minimize, MoreHorizontal, Pause, PencilLine,
+  Download, Link2, LockKeyhole, LogOut, Mail, Maximize, Menu, Minimize, MoreHorizontal, Pause, PencilLine,
   Play, Plus, Settings2, ShieldCheck, SkipBack, SkipForward, Upload, UserRound,
   StickyNote, Trash2, VideoOff, Volume2, VolumeX, X,
 } from 'lucide-react'
@@ -408,6 +408,100 @@ function ResourceLinkPane({ url, label }) {
       {url
         ? <a className="resource-open-button" href={url} target="_blank" rel="noreferrer">{label} <ExternalLink /></a>
         : <button className="resource-open-button" disabled>{label}</button>}
+    </motion.div>
+  )
+}
+
+function SelfNotesPane({ lecture, userId, onSaved }) {
+  const draftKey = `arcwell:self-notes-draft:${userId}:${lecture.id}`
+  const [text, setText] = useState(() => {
+    try { return localStorage.getItem(draftKey) ?? lecture.selfNotes?.text ?? '' }
+    catch { return lecture.selfNotes?.text ?? '' }
+  })
+  const [savedText, setSavedText] = useState(lecture.selfNotes?.text ?? '')
+  const currentTextRef = useRef(text)
+  const [saving, setSaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [error, setError] = useState('')
+  const hasChanges = text !== savedText
+
+  const changeText = (event) => {
+    const next = event.target.value
+    currentTextRef.current = next
+    setText(next)
+    setError('')
+    try { localStorage.setItem(draftKey, next) } catch { /* Saving to the server remains available. */ }
+  }
+
+  const save = async () => {
+    const savingText = currentTextRef.current
+    try {
+      setSaving(true)
+      setError('')
+      const savedNote = await api.saveSelfNotes(lecture.id, savingText)
+      setSavedText(savingText)
+      onSaved(lecture.id, savedNote)
+      if (currentTextRef.current === savingText) {
+        try { localStorage.removeItem(draftKey) } catch { /* The server copy is saved. */ }
+      }
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const exportPdf = async () => {
+    if (!text.trim()) return
+    try {
+      setExporting(true)
+      setError('')
+      const { jsPDF } = await import('jspdf')
+      const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
+      const margin = 48
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      let y = 55
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(17)
+      for (const line of pdf.splitTextToSize(lecture.title, pageWidth - margin * 2)) {
+        pdf.text(line, margin, y)
+        y += 23
+      }
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(10)
+      pdf.setTextColor(105)
+      pdf.text('SELF NOTES', margin, y + 7)
+      y += 35
+      pdf.setTextColor(30)
+      pdf.setFontSize(11)
+      for (const paragraph of text.replace(/\r\n/g, '\n').split('\n')) {
+        const lines = pdf.splitTextToSize(paragraph || ' ', pageWidth - margin * 2)
+        for (const line of lines) {
+          if (y > pageHeight - margin) { pdf.addPage(); y = margin }
+          pdf.text(line, margin, y)
+          y += 17
+        }
+      }
+      const filename = lecture.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'lesson'
+      pdf.save(`${filename}-self-notes.pdf`)
+    } catch {
+      setError('Could not export the PDF. Please try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  return (
+    <motion.div className="self-notes-pane" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+      <div className="pane-heading">
+        <div><h3>Self notes</h3><p>Write down what matters from this lesson. Your saved notes are private to your account.</p></div>
+        <span className={`save-status ${!hasChanges && text ? 'saved' : ''}`}>{saving ? 'Saving…' : hasChanges ? 'Unsaved draft' : text ? 'Saved' : ''}</span>
+      </div>
+      <label className="self-notes-label" htmlFor="self-notes-editor">Your notes for {lecture.title}</label>
+      <textarea id="self-notes-editor" value={text} onChange={changeText} maxLength={20000} placeholder="Write your thoughts, takeaways, or questions here…" />
+      {error && <span className="form-error" role="alert">{error}</span>}
+      <div className="note-footer"><span>{text.length.toLocaleString()} / 20,000 characters</span><div className="note-actions"><button className="self-notes-export" onClick={exportPdf} disabled={!text.trim() || exporting}><Download /> {exporting ? 'Exporting…' : 'Export PDF'}</button><button className="primary-button" onClick={save} disabled={!hasChanges || saving}>{saving ? 'Saving…' : 'Save notes'}</button></div></div>
     </motion.div>
   )
 }
@@ -877,6 +971,12 @@ export default function App() {
     setData(updated)
   }
 
+  const updateSavedSelfNotes = (lectureId, selfNotes) => {
+    setData((current) => current.lecture.id === lectureId
+      ? { ...current, lecture: { ...current.lecture, selfNotes } }
+      : current)
+  }
+
   if (!authReady) return <main className="load-state"><div className="brand-mark pulse">A</div><span>Checking your session…</span></main>
   if (error) return <main className="load-state"><div className="brand-mark">A</div><h1>Arcwell is offline</h1><p>{error}</p><button className="primary-button" onClick={logout}>Log out</button></main>
   if (!user) return <AuthScreen onAuthenticate={authenticate} />
@@ -949,13 +1049,13 @@ export default function App() {
             <button className={activeTab === 'notes' ? 'active' : ''} onClick={() => setActiveTab('notes')}><FileText /> Notes</button>
             <button className={activeTab === 'assignment' ? 'active' : ''} onClick={() => setActiveTab('assignment')}><BookOpen /> Assignment <span className="tab-count">1</span></button>
             <button className={activeTab === 'repository' ? 'active' : ''} onClick={() => setActiveTab('repository')}><Github /> GitHub repo</button>
-            <button className={activeTab === 'outline' ? 'active' : ''} onClick={() => setActiveTab('outline')}><List /> Lesson details</button>
+            <button className={activeTab === 'self-notes' ? 'active' : ''} onClick={() => setActiveTab('self-notes')}><PencilLine /> Self notes</button>
           </div>
           <AnimatePresence mode="wait">
             {activeTab === 'notes' && <ResourceLinkPane key="notes" url={data.lecture.classNotesUrl} label="Open notes" />}
             {activeTab === 'assignment' && <ResourceLinkPane key="assignment" url={data.lecture.assignmentPdfUrl || data.assignments[0]?.submission} label="Open assignment" />}
             {activeTab === 'repository' && <ResourceLinkPane key="repository" url={data.lecture.githubRepoUrl} label="Open GitHub repository" />}
-            {activeTab === 'outline' && <motion.div key="outline" className="details-pane" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><div><span>In this lesson</span><h3>Turn raw conversations into evidence your team can use.</h3></div><ol><li><span>00:00</span>What counts as a signal</li><li><span>07:42</span>Separate behavior from opinion</li><li><span>18:10</span>Build the opportunity map</li></ol></motion.div>}
+            {activeTab === 'self-notes' && <SelfNotesPane key={data.lecture.id} lecture={data.lecture} userId={user.id} onSaved={updateSavedSelfNotes} />}
           </AnimatePresence>
         </section>
       </main>

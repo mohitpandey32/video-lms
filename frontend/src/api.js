@@ -85,4 +85,8 @@ export const api = {
     `/api/progress/notes/${encodeURIComponent(lectureId)}`,
     { method: 'POST', body: json(payload) },
   ),
+  saveSelfNotes: (lectureId, text) => request(
+    `/api/progress/self-notes/${encodeURIComponent(lectureId)}`,
+    { method: 'PUT', body: json({ text }) },
+  ),
 }

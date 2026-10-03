@@ -17,6 +17,7 @@ import {
   submitAssignment,
   updatePlaybackPosition,
   updateProgress,
+  updateSelfNotes,
 } from '../controllers/courseController.js'
 import { requireAdmin, requireAuth } from '../middleware/authMiddleware.js'
 
@@ -26,6 +27,7 @@ router.use(requireAuth)
 
 router.get('/course', showCourse)
 router.post('/progress/notes/:lectureId', createVideoNote)
+router.put('/progress/self-notes/:lectureId', updateSelfNotes)
 router.put('/progress/playback/:lectureId', updatePlaybackPosition)
 router.put('/progress/:moduleIndex/:lectureIndex', updateProgress)
 router.put('/lectures/:id/select', selectLectureById)

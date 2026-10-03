@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { getCourse, saveCourse } from '../models/courseModel.js'
-import { addVideoNote, getUserProgress, savePlaybackPosition, saveUserProgress } from '../models/progressModel.js'
+import { addVideoNote, getUserProgress, savePlaybackPosition, saveSelfNotes, saveUserProgress } from '../models/progressModel.js'
 import { applyUserProgress, getProgressSummary, lessonKey } from '../services/courseService.js'
 import { isValidWebUrl } from '../utils/url.js'
 
@@ -87,6 +87,23 @@ export async function createVideoNote(req, res) {
     res.status(201).json(await addVideoNote(req.user.id, lectureId, note))
   } catch {
     res.status(500).json({ message: 'Could not save the timestamped note.' })
+  }
+}
+
+export async function updateSelfNotes(req, res) {
+  const lectureId = String(req.params.lectureId || '')
+  const text = req.body?.text
+  if (!/^[a-zA-Z0-9_-]{1,160}$/.test(lectureId) || typeof text !== 'string' || text.length > 20000) {
+    return res.status(400).json({ message: 'Enter notes of 20,000 characters or fewer for a valid lesson.' })
+  }
+
+  try {
+    const course = await getCourse()
+    const lectureExists = course.modules.some((module) => module.lessons.some((lecture) => lecture.id === lectureId))
+    if (!lectureExists) return res.status(404).json({ message: 'Lecture not found.' })
+    res.json(await saveSelfNotes(req.user.id, lectureId, text))
+  } catch {
+    res.status(500).json({ message: 'Could not save your notes.' })
   }
 }
 
