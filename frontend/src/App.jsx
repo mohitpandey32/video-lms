@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { api } from './api'
 import {
-  ArrowLeft, BookOpen, Check, ChevronDown, ChevronRight, Circle,
+  ArrowLeft, BookOpen, Check, ChevronRight, Circle,
   ClipboardList, ExternalLink, Eye, FileText, Gauge, Github, GraduationCap, GripVertical, LayoutList,
   Download, Link2, LockKeyhole, LogOut, Mail, Maximize, Menu, Minimize, MoreHorizontal, Pause, PencilLine,
   Play, Plus, Settings2, ShieldCheck, SkipBack, SkipForward, Upload, UserRound,
@@ -22,27 +22,6 @@ function isDriveUrl(url = '') {
   return url.includes('drive.google.com')
 }
 
-const qualityLevels = ['360p', '480p', '720p', '1080p']
-
-function videoEmbedUrl(url) {
-  if (!isDriveUrl(url)) return url
-  const id = url.match(/drive\.google\.com\/file\/d\/([^/]+)/)?.[1] || url.match(/[?&]id=([^&]+)/)?.[1]
-  return id ? `https://drive.google.com/file/d/${id}/preview` : url
-}
-
-function QualityMenu({ selected, options, onSelect, embedded = false }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className={`quality-menu ${embedded ? 'quality-menu--embed' : ''}`} onDoubleClick={(event) => event.stopPropagation()}>
-      <button type="button" className="quality-trigger" onClick={() => setOpen((value) => !value)} aria-label={`Video quality: ${selected}`} aria-expanded={open}>Quality {selected} <ChevronDown /></button>
-      <AnimatePresence>{open && <motion.div className="quality-popover" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} role="group" aria-label="Video quality">
-        {options.map((option) => <button type="button" aria-pressed={option.label === selected} key={option.label} onClick={() => { onSelect(option); setOpen(false) }}>{option.label}{option.label === selected && <Check />}</button>)}
-        {options.length === 1 && <span className="quality-unavailable">No other resolutions available</span>}
-      </motion.div>}</AnimatePresence>
-    </div>
-  )
-}
-
 function Player({ lecture, userId, onComplete }) {
   const videoRef = useRef(null)
   const playerRef = useRef(null)
@@ -52,14 +31,12 @@ function Player({ lecture, userId, onComplete }) {
   const lastLocalSecondRef = useRef(0)
   const lastServerSecondRef = useRef(Number(lecture.resumeAt) || 0)
   const restoringPositionRef = useRef(false)
-  const qualitySwitchRef = useRef(null)
   const [playing, setPlaying] = useState(false)
   const [current, setCurrent] = useState(0)
   const [duration, setDuration] = useState(0)
   const [volume, setVolume] = useState(0.8)
   const [speed, setSpeed] = useState(1)
   const [showSpeed, setShowSpeed] = useState(false)
-  const [quality, setQuality] = useState('Original')
   const [controlsVisible, setControlsVisible] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [videoAspect, setVideoAspect] = useState('16 / 9')
@@ -69,18 +46,11 @@ function Player({ lecture, userId, onComplete }) {
   const [noteText, setNoteText] = useState('')
   const [noteSaving, setNoteSaving] = useState(false)
   const [noteError, setNoteError] = useState('')
-  const qualityOptions = [
-    { label: 'Original', url: lecture.videoUrl },
-    ...qualityLevels.map((label) => ({ label, url: lecture.videoQualities?.[label] }))
-      .filter((option) => option.url && option.url !== lecture.videoUrl),
-  ]
-  const selectedUrl = qualityOptions.find((option) => option.label === quality)?.url || lecture.videoUrl
-  const drive = isDriveUrl(selectedUrl)
+  const drive = isDriveUrl(lecture.videoUrl)
   const playbackStorageKey = lecture.id && userId ? `arcwell:playback:${userId}:${lecture.id}` : ''
 
   useEffect(() => {
     setPlaying(false); setCurrent(0); setDuration(0); setControlsVisible(true); setVideoAspect('16 / 9'); setResumeNotice(null)
-    setQuality('Original'); qualitySwitchRef.current = null
     setVideoNotes(lecture.videoNotes || []); setNoteTimestamp(null); setNoteText(''); setNoteError('')
     lastLocalSecondRef.current = 0
     lastServerSecondRef.current = Number(lecture.resumeAt) || 0
@@ -266,17 +236,6 @@ function Player({ lecture, userId, onComplete }) {
     if (videoRef.current) videoRef.current.playbackRate = next
   }
 
-  const changeQuality = (option) => {
-    if (option.label === quality) return
-    const video = videoRef.current
-    qualitySwitchRef.current = video && !isDriveUrl(option.url)
-      ? { seconds: video.currentTime, wasPlaying: !video.paused }
-      : null
-    setQuality(option.label)
-    setResumeNotice(null)
-    revealControls()
-  }
-
   const toggleFullscreen = async () => {
     const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement
     try {
@@ -299,9 +258,8 @@ function Player({ lecture, userId, onComplete }) {
   if (drive) {
     return (
       <div className="player player--embed">
-        <iframe src={videoEmbedUrl(selectedUrl)} title={lecture.title} allow="autoplay; fullscreen" allowFullScreen />
-        <QualityMenu selected={quality} options={qualityOptions} onSelect={changeQuality} embedded />
-        <div className="embed-note"><span>Google Drive preview</span><span>{qualityOptions.length > 1 ? 'Changing quality restarts playback' : 'Playback controls are provided by Drive'}</span></div>
+        <iframe src={lecture.embedUrl} title={lecture.title} allow="autoplay; fullscreen" allowFullScreen />
+        <div className="embed-note"><span>Google Drive preview</span><span>Playback controls are provided by Drive</span></div>
       </div>
     )
   }
@@ -324,7 +282,7 @@ function Player({ lecture, userId, onComplete }) {
       onFocusCapture={revealControls}
     >
       <video
-        ref={videoRef} src={selectedUrl} preload="metadata"
+        ref={videoRef} src={lecture.embedUrl || lecture.videoUrl} preload="metadata"
         onPlay={() => setPlaying(true)} onPause={(event) => { setPlaying(false); cachePlaybackPosition(event.currentTarget, true); syncPlaybackPosition({ force: true }) }}
         onTimeUpdate={(event) => { setCurrent(event.currentTarget.currentTime); cachePlaybackPosition(event.currentTarget) }}
         onSeeked={(event) => {
@@ -337,15 +295,6 @@ function Player({ lecture, userId, onComplete }) {
           if (video.videoWidth && video.videoHeight) setVideoAspect(`${video.videoWidth} / ${video.videoHeight}`)
           video.volume = volume
           video.playbackRate = speed
-          if (qualitySwitchRef.current) {
-            const { seconds, wasPlaying } = qualitySwitchRef.current
-            qualitySwitchRef.current = null
-            const target = Number.isFinite(video.duration) ? Math.min(seconds, Math.max(0, video.duration - 0.1)) : seconds
-            video.currentTime = target
-            setCurrent(target)
-            if (wasPlaying) video.play().catch(() => {})
-            return
-          }
           const serverSeconds = normalizePlaybackPosition(Number(lecture.resumeAt), video.duration)
           const serverUpdatedAt = Date.parse(lecture.resumeUpdatedAt || '') || 0
           let localPosition = null
@@ -410,7 +359,6 @@ function Player({ lecture, userId, onComplete }) {
             <button className="add-note-control" onClick={openNoteEditor} disabled={!lecture.id} aria-label="Add note at current time" title="Add timestamped note"><StickyNote /><span>Note</span></button>
           </div>
           <div className="control-cluster">
-            <QualityMenu selected={quality} options={qualityOptions} onSelect={changeQuality} />
             <div className="speed-menu">
               <button onClick={() => setShowSpeed(!showSpeed)}>{speed}×</button>
               <AnimatePresence>{showSpeed && <motion.div className="speed-popover" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}>{[0.75, 1, 1.25, 1.5, 2].map((rate) => <button key={rate} className={rate === speed ? 'active' : ''} onClick={() => changeSpeed(rate)}>{rate}×</button>)}</motion.div>}</AnimatePresence>
@@ -482,16 +430,6 @@ function ResourceLinkPane({ url, label }) {
         ? <a className="resource-open-button" href={url} target="_blank" rel="noreferrer">{label} <ExternalLink /></a>
         : <button className="resource-open-button" disabled>{label}</button>}
     </motion.div>
-  )
-}
-
-function QualitySourceFields({ value, onChange }) {
-  return (
-    <div className="quality-source-fields">
-      <div className="resource-divider"><span>Video quality options</span></div>
-      <p>Add a separate public video for each resolution. The primary URL stays available as Original. Switching Google Drive files restarts playback.</p>
-      <div className="form-grid">{qualityLevels.map((level) => <label key={level}>{level} URL <em>Optional</em><input value={value?.[level] || ''} onChange={(event) => onChange({ ...value, [level]: event.target.value })} placeholder="Public MP4, WebM, or Google Drive link" /></label>)}</div>
-    </div>
   )
 }
 
@@ -592,16 +530,14 @@ function SelfNotesPane({ lecture, userId, onSaved }) {
 function VideoModal({ lecture, onClose, onSave }) {
   const [title, setTitle] = useState(lecture.title)
   const [videoUrl, setVideoUrl] = useState(lecture.videoUrl)
-  const [videoQualities, setVideoQualities] = useState(lecture.videoQualities || {})
   const [error, setError] = useState('')
-  const save = async () => { try { setError(''); await onSave({ title, videoUrl, videoQualities }); onClose() } catch (err) { setError(err.message) } }
+  const save = async () => { try { setError(''); await onSave({ title, videoUrl }); onClose() } catch (err) { setError(err.message) } }
   return (
     <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
-      <motion.div className="modal lecture-form" initial={{ scale: .96, y: 16 }} animate={{ scale: 1, y: 0 }} exit={{ scale: .96, y: 16 }} onMouseDown={(e) => e.stopPropagation()}>
+      <motion.div className="modal" initial={{ scale: .96, y: 16 }} animate={{ scale: 1, y: 0 }} exit={{ scale: .96, y: 16 }} onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-heading"><div><span className="modal-icon"><Upload /></span><div><h2>Set lecture video</h2><p>Use a public Google Drive or direct video URL.</p></div></div><button className="icon-button" onClick={onClose}><X /></button></div>
         <label>Lecture title<input value={title} onChange={(e) => setTitle(e.target.value)} /></label>
         <label>Public video URL<input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://drive.google.com/file/d/…/view" /></label>
-        <QualitySourceFields value={videoQualities} onChange={setVideoQualities} />
         <div className="share-help"><Gauge /><span><b>Google Drive:</b> set General access to “Anyone with the link” before saving.</span></div>
         {error && <span className="form-error">{error}</span>}
         <div className="modal-actions"><button className="text-button" onClick={onClose}>Cancel</button><button className="primary-button" onClick={save}>Use this video</button></div>
@@ -611,7 +547,7 @@ function VideoModal({ lecture, onClose, onSave }) {
 }
 
 function NewLectureModal({ modules, initialModuleIndex = 0, onClose, onCreate }) {
-  const [form, setForm] = useState({ title: '', moduleIndex: String(initialModuleIndex), duration: '', videoUrl: '', videoQualities: {}, classNotesUrl: '', assignmentPdfUrl: '', githubRepoUrl: '' })
+  const [form, setForm] = useState({ title: '', moduleIndex: String(initialModuleIndex), duration: '', videoUrl: '', classNotesUrl: '', assignmentPdfUrl: '', githubRepoUrl: '' })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const update = (field) => (event) => setForm((current) => ({ ...current, [field]: event.target.value }))
@@ -639,7 +575,6 @@ function NewLectureModal({ modules, initialModuleIndex = 0, onClose, onCreate })
         </div>
         <div className="resource-divider"><span>Lecture resources</span></div>
         <label>Public video URL <em>Required</em><input value={form.videoUrl} onChange={update('videoUrl')} placeholder="https://drive.google.com/file/d/…/view" /></label>
-        <QualitySourceFields value={form.videoQualities} onChange={(videoQualities) => setForm((current) => ({ ...current, videoQualities }))} />
         <label>Class notes PDF URL <em>Optional</em><input value={form.classNotesUrl} onChange={update('classNotesUrl')} placeholder="https://drive.google.com/…/class-notes.pdf" /></label>
         <label>Assignment PDF URL <em>Optional</em><input value={form.assignmentPdfUrl} onChange={update('assignmentPdfUrl')} placeholder="https://drive.google.com/…/assignment.pdf" /></label>
         <label>GitHub repository URL <em>Optional</em><input value={form.githubRepoUrl} onChange={update('githubRepoUrl')} placeholder="https://github.com/organization/repository" /></label>
@@ -654,7 +589,6 @@ function NewLectureModal({ modules, initialModuleIndex = 0, onClose, onCreate })
 function LectureResourcesModal({ lecture, onClose, onSave }) {
   const [form, setForm] = useState({
     videoUrl: lecture.videoUrl || '',
-    videoQualities: lecture.videoQualities || {},
     classNotesUrl: lecture.classNotesUrl || '',
     assignmentPdfUrl: lecture.assignmentPdfUrl || '',
     githubRepoUrl: lecture.githubRepoUrl || '',
@@ -680,7 +614,6 @@ function LectureResourcesModal({ lecture, onClose, onSave }) {
       <motion.form className="modal lecture-form" initial={{ scale: .96, y: 18 }} animate={{ scale: 1, y: 0 }} exit={{ scale: .96, y: 18 }} onSubmit={submit} onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-heading"><div><span className="modal-icon"><Link2 /></span><div><h2>Lecture resources</h2><p>{lecture.title}</p></div></div><button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X /></button></div>
         <label>Public video URL<input autoFocus value={form.videoUrl} onChange={update('videoUrl')} placeholder="Google Drive, MP4, or WebM link" /></label>
-        <QualitySourceFields value={form.videoQualities} onChange={(videoQualities) => setForm((current) => ({ ...current, videoQualities }))} />
         <label>Class notes PDF URL<input value={form.classNotesUrl} onChange={update('classNotesUrl')} placeholder="Public PDF or Google Drive link" /></label>
         <label>Assignment PDF URL<input value={form.assignmentPdfUrl} onChange={update('assignmentPdfUrl')} placeholder="Public PDF or Google Drive link" /></label>
         <label>GitHub repository URL<input value={form.githubRepoUrl} onChange={update('githubRepoUrl')} placeholder="https://github.com/organization/repository" /></label>
@@ -1019,7 +952,7 @@ export default function App() {
       modules: current.modules.map((module) => ({
         ...module,
         lessons: module.lessons.map((lesson) => lesson.id === lecture.id
-          ? { ...lesson, title: lecture.title, videoUrl: lecture.videoUrl, embedUrl: lecture.embedUrl, videoQualities: lecture.videoQualities }
+          ? { ...lesson, title: lecture.title, videoUrl: lecture.videoUrl, embedUrl: lecture.embedUrl }
           : lesson),
       })),
     }))
