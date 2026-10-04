@@ -236,10 +236,24 @@ function Player({ lecture, userId, onComplete }) {
   }
 
   const jump = (amount) => {
-    if (videoRef.current) {
-      videoRef.current.currentTime += amount
-      syncPlaybackPosition({ force: true })
-    }
+    const video = videoRef.current
+    if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return
+    const next = Math.max(0, Math.min(video.duration, video.currentTime + amount))
+    video.currentTime = next
+    setCurrent(next)
+    cachePlaybackPosition(video, true)
+    syncPlaybackPosition({ force: true, seconds: next })
+    revealControls()
+  }
+
+  const handlePlayerKeyDown = (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+    const target = event.target
+    const isTimeline = target.classList?.contains('timeline')
+    if (target.isContentEditable || (!isTimeline && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
+    event.preventDefault()
+    jump(event.key === 'ArrowLeft' ? -10 : 10)
   }
 
   const changeVolume = (next) => {
@@ -296,7 +310,14 @@ function Player({ lecture, userId, onComplete }) {
     <div
       className={`player ${playing ? 'playing' : 'paused'} ${controlsVisible ? 'controls-visible' : 'controls-hidden'}`}
       ref={playerRef}
+      tabIndex={0}
+      role="region"
+      aria-label="Video player. Use left and right arrow keys to seek 10 seconds."
       style={{ '--video-aspect': videoAspect }}
+      onKeyDown={handlePlayerKeyDown}
+      onPointerDownCapture={(event) => {
+        if (event.target === event.currentTarget || event.target === videoRef.current) event.currentTarget.focus({ preventScroll: true })
+      }}
       onDoubleClick={toggleFullscreen}
       onPointerMove={revealControls}
       onPointerLeave={() => { if (playing && !showSpeed) setControlsVisible(false) }}
@@ -380,9 +401,9 @@ function Player({ lecture, userId, onComplete }) {
         </div>
         <div className="control-row">
           <div className="control-cluster">
-            <button onClick={() => jump(-10)} aria-label="Back 10 seconds"><SkipBack /></button>
+            <button onClick={() => jump(-10)} aria-label="Back 10 seconds" title="Back 10 seconds (←)"><SkipBack /></button>
             <button className="play-small" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}>{playing ? <Pause fill="currentColor" /> : <Play fill="currentColor" />}</button>
-            <button onClick={() => jump(10)} aria-label="Forward 10 seconds"><SkipForward /></button>
+            <button onClick={() => jump(10)} aria-label="Forward 10 seconds" title="Forward 10 seconds (→)"><SkipForward /></button>
             <button onClick={() => changeVolume(volume ? 0 : 0.8)} aria-label="Mute">{volume ? <Volume2 /> : <VolumeX />}</button>
             <input className="volume" type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => changeVolume(Number(e.target.value))} />
             <span className="time">{formatTime(current)} <i>/</i> {formatTime(duration)}</span>
