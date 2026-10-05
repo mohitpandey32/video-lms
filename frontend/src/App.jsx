@@ -6,7 +6,7 @@ import {
   ClipboardList, ExternalLink, Eye, FileText, Gauge, Github, GraduationCap, GripVertical, LayoutList,
   Download, Link2, LockKeyhole, LogOut, Mail, Maximize, Menu, Minimize, MoreHorizontal, Pause, PencilLine,
   Play, Plus, Settings2, ShieldCheck, SkipBack, SkipForward, Upload, UserRound,
-  StickyNote, Trash2, VideoOff, Volume2, VolumeX, X,
+  StickyNote, Trash2, UnlockKeyhole, VideoOff, Volume2, VolumeX, X,
 } from 'lucide-react'
 
 function formatTime(value) {
@@ -25,6 +25,7 @@ function isDriveUrl(url = '') {
 function Player({ lecture, userId, onComplete }) {
   const videoRef = useRef(null)
   const playerRef = useRef(null)
+  const lockButtonRef = useRef(null)
   const controlsTimerRef = useRef(null)
   const resumeNoticeTimerRef = useRef(null)
   const controlsHoverRef = useRef(false)
@@ -38,6 +39,7 @@ function Player({ lecture, userId, onComplete }) {
   const [speed, setSpeed] = useState(1)
   const [showSpeed, setShowSpeed] = useState(false)
   const [controlsVisible, setControlsVisible] = useState(true)
+  const [isLocked, setIsLocked] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [videoAspect, setVideoAspect] = useState('16 / 9')
   const [resumeNotice, setResumeNotice] = useState(null)
@@ -50,7 +52,8 @@ function Player({ lecture, userId, onComplete }) {
   const playbackStorageKey = lecture.id && userId ? `arcwell:playback:${userId}:${lecture.id}` : ''
 
   useEffect(() => {
-    setPlaying(false); setCurrent(0); setDuration(0); setControlsVisible(true); setVideoAspect('16 / 9'); setResumeNotice(null)
+    setPlaying(false); setCurrent(0); setDuration(0); setControlsVisible(true); setIsLocked(false); setShowSpeed(false); setVideoAspect('16 / 9'); setResumeNotice(null)
+    controlsHoverRef.current = false
     setVideoNotes(lecture.videoNotes || []); setNoteTimestamp(null); setNoteText(''); setNoteError('')
     lastLocalSecondRef.current = 0
     lastServerSecondRef.current = Number(lecture.resumeAt) || 0
@@ -91,6 +94,7 @@ function Player({ lecture, userId, onComplete }) {
   }
 
   const clearPlaybackPosition = () => {
+    if (isLocked) return
     const video = videoRef.current
     if (!video) return
     restoringPositionRef.current = true
@@ -105,6 +109,7 @@ function Player({ lecture, userId, onComplete }) {
   }
 
   const openNoteEditor = () => {
+    if (isLocked) return
     const video = videoRef.current
     if (!video || !lecture.id) return
     video.pause()
@@ -143,7 +148,7 @@ function Player({ lecture, userId, onComplete }) {
   }
 
   const seekToNote = (seconds) => {
-    if (!videoRef.current) return
+    if (isLocked || !videoRef.current) return
     videoRef.current.currentTime = seconds
     setCurrent(seconds)
     syncPlaybackPosition({ force: true, seconds })
@@ -165,6 +170,7 @@ function Player({ lecture, userId, onComplete }) {
   }, [])
 
   const revealControls = () => {
+    if (isLocked) return
     setControlsVisible(true)
     window.clearTimeout(controlsTimerRef.current)
     if (playing && !showSpeed) {
@@ -177,7 +183,17 @@ function Player({ lecture, userId, onComplete }) {
   useEffect(() => {
     revealControls()
     return () => window.clearTimeout(controlsTimerRef.current)
-  }, [playing, showSpeed, lecture.videoUrl])
+  }, [playing, showSpeed, isLocked, lecture.videoUrl])
+
+  const togglePlayerLock = () => {
+    window.clearTimeout(controlsTimerRef.current)
+    controlsHoverRef.current = false
+    setShowSpeed(false)
+    setIsLocked(!isLocked)
+    setControlsVisible(isLocked)
+    // Move focus out of playback controls, including the Drive iframe.
+    lockButtonRef.current?.focus({ preventScroll: true })
+  }
 
   useEffect(() => {
     if (!playing || drive || !lecture.id) return undefined
@@ -200,12 +216,14 @@ function Player({ lecture, userId, onComplete }) {
   }, [drive, lecture.id])
 
   const toggle = () => {
+    if (isLocked) return
     const video = videoRef.current
     if (!video) return
     video.paused ? video.play() : video.pause()
   }
 
   const jump = (amount) => {
+    if (isLocked) return
     const video = videoRef.current
     if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return
     const next = Math.max(0, Math.min(video.duration, video.currentTime + amount))
@@ -217,6 +235,14 @@ function Player({ lecture, userId, onComplete }) {
   }
 
   const handlePlayerKeyDown = (event) => {
+    if (isLocked) {
+      // Keep Tab navigation, button activation, and the browser's Escape available.
+      if (!['Tab', 'Escape'].includes(event.key) && event.target !== lockButtonRef.current) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+      return
+    }
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
     const target = event.target
@@ -227,16 +253,19 @@ function Player({ lecture, userId, onComplete }) {
   }
 
   const changeVolume = (next) => {
+    if (isLocked) return
     setVolume(next)
     if (videoRef.current) videoRef.current.volume = next
   }
 
   const changeSpeed = (next) => {
+    if (isLocked) return
     setSpeed(next); setShowSpeed(false)
     if (videoRef.current) videoRef.current.playbackRate = next
   }
 
   const toggleFullscreen = async () => {
+    if (isLocked) return
     const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement
     try {
       if (fullscreenElement === playerRef.current) {
@@ -255,30 +284,54 @@ function Player({ lecture, userId, onComplete }) {
     return <div className="player player--empty"><span><VideoOff /></span><div><b>Video not published yet</b><p>You can still review the available lesson resources.</p></div></div>
   }
 
+  const lockControl = (
+    <button
+      type="button"
+      ref={lockButtonRef}
+      className="player-lock-toggle"
+      onClick={togglePlayerLock}
+      onDoubleClick={(event) => event.stopPropagation()}
+      aria-label={isLocked ? 'Unlock player controls' : 'Lock player controls'}
+      aria-pressed={isLocked}
+      disabled={noteTimestamp !== null}
+      title={noteTimestamp !== null ? 'Close the note editor to lock controls' : isLocked ? 'Unlock player controls' : 'Lock controls to prevent accidental taps'}
+    >
+      {isLocked ? <UnlockKeyhole /> : <LockKeyhole />}
+      <span>{isLocked ? 'Unlock' : 'Lock'}</span>
+    </button>
+  )
+  const lockOverlay = isLocked && <div className="player-lock-overlay" aria-hidden="true" />
+  const lockStatus = <span className="player-lock-status" role="status">{isLocked ? 'Player controls locked. Use Unlock to restore controls.' : ''}</span>
+
   if (drive) {
     return (
-      <div className="player player--embed">
-        <iframe src={lecture.embedUrl} title={lecture.title} allow="autoplay; fullscreen" allowFullScreen />
+      <div className={`player player--embed ${isLocked ? 'player--locked' : ''}`} ref={playerRef} role="region" aria-label="Video player" onKeyDown={handlePlayerKeyDown}>
+        <iframe src={lecture.embedUrl} title={lecture.title} allow="autoplay; fullscreen" allowFullScreen tabIndex={isLocked ? -1 : undefined} aria-hidden={isLocked ? true : undefined} />
         <div className="embed-note"><span>Google Drive preview</span><span>Playback controls are provided by Drive</span></div>
+        {lockOverlay}
+        {lockControl}
+        {lockStatus}
       </div>
     )
   }
 
   return (
     <div
-      className={`player ${playing ? 'playing' : 'paused'} ${controlsVisible ? 'controls-visible' : 'controls-hidden'}`}
+      className={`player ${playing ? 'playing' : 'paused'} ${controlsVisible ? 'controls-visible' : 'controls-hidden'} ${isLocked ? 'player--locked' : ''}`}
       ref={playerRef}
       tabIndex={0}
       role="region"
-      aria-label="Video player. Use left and right arrow keys to seek 10 seconds."
+      aria-label={isLocked ? 'Video player. Controls locked.' : 'Video player. Use left and right arrow keys to seek 10 seconds.'}
       style={{ '--video-aspect': videoAspect }}
       onKeyDown={handlePlayerKeyDown}
       onPointerDownCapture={(event) => {
         if (event.target === event.currentTarget || event.target === videoRef.current) event.currentTarget.focus({ preventScroll: true })
       }}
-      onDoubleClick={toggleFullscreen}
+      onDoubleClick={(event) => {
+        if (event.target === event.currentTarget || event.target === videoRef.current) toggleFullscreen()
+      }}
       onPointerMove={revealControls}
-      onPointerLeave={() => { if (playing && !showSpeed) setControlsVisible(false) }}
+      onPointerLeave={() => { if (!isLocked && playing && !showSpeed) setControlsVisible(false) }}
       onFocusCapture={revealControls}
     >
       <video
@@ -326,16 +379,19 @@ function Player({ lecture, userId, onComplete }) {
           onComplete?.()
         }}
       />
-      <AnimatePresence>{resumeNotice !== null && <motion.div className="resume-notice" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}><span>Resumed at {formatTime(resumeNotice)}</span><button onClick={clearPlaybackPosition}>Start over</button></motion.div>}</AnimatePresence>
+      {lockOverlay}
+      {lockControl}
+      {lockStatus}
+      <AnimatePresence>{!isLocked && resumeNotice !== null && <motion.div className="resume-notice" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}><span>Resumed at {formatTime(resumeNotice)}</span><button onClick={clearPlaybackPosition}>Start over</button></motion.div>}</AnimatePresence>
       <AnimatePresence>{noteTimestamp !== null && <motion.form className="timestamp-note-editor" initial={{ opacity: 0, y: 10, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: .98 }} onSubmit={saveTimestampedNote} onDoubleClick={(event) => event.stopPropagation()}>
         <div className="timestamp-note-heading"><span><StickyNote /> Note at {formatTime(noteTimestamp)}</span><button type="button" onClick={closeNoteEditor} aria-label="Close note editor"><X /></button></div>
         <textarea autoFocus maxLength="1000" value={noteText} onChange={(event) => setNoteText(event.target.value)} placeholder="Add a reminder, question, or key idea…" />
         <div className="timestamp-note-actions"><span className={noteError ? 'note-error' : ''}>{noteError || `${noteText.length}/1000`}</span><button className="save-note-button" disabled={noteSaving}>{noteSaving ? 'Saving…' : 'Save note'}</button></div>
       </motion.form>}</AnimatePresence>
-      <button className="center-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}>
+      {!isLocked && <button className="center-play" onClick={toggle} aria-label={playing ? 'Pause' : 'Play'}>
         {playing ? <Pause fill="currentColor" /> : <Play fill="currentColor" />}
-      </button>
-      <div className="controls" onPointerEnter={() => { controlsHoverRef.current = true; window.clearTimeout(controlsTimerRef.current) }} onPointerLeave={() => { controlsHoverRef.current = false; revealControls() }}>
+      </button>}
+      {!isLocked && <div className="controls" onPointerEnter={() => { controlsHoverRef.current = true; window.clearTimeout(controlsTimerRef.current) }} onPointerLeave={() => { controlsHoverRef.current = false; revealControls() }}>
         <div className="timeline-shell">
           <input className="timeline" type="range" min="0" max={duration || 0} value={current} step="0.1"
             style={{ '--played': `${duration ? (current / duration) * 100 : 0}%` }}
@@ -366,7 +422,7 @@ function Player({ lecture, userId, onComplete }) {
             <button onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>{isFullscreen ? <Minimize /> : <Maximize />}</button>
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   )
 }
