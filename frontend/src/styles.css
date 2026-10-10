@@ -259,6 +259,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .auth-tabs button.active { color: var(--ink); }
 .auth-tabs button.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--ink); }
 .auth-form-wrap form { display: flex; flex-direction: column; gap: 17px; }
+.auth-form-wrap > p + form { margin-top: 31px; }
 .auth-form-wrap label { font-size: 10px; font-weight: 600; }
 .auth-input { height: 46px; margin-top: 7px; display: flex; align-items: center; gap: 10px; padding: 0 13px; border: 1px solid var(--line); background: white; transition: border-color .15s, box-shadow .15s; }
 .auth-input:focus-within { border-color: #9abf52; box-shadow: 0 0 0 3px rgba(184,243,76,.16); }

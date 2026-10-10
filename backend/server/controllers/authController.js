@@ -16,6 +16,10 @@ export async function getCurrentUser(req, res, next) {
 }
 
 export async function signup(req, res, next) {
+  if (process.env.SIGNUP_ENABLED !== 'true') {
+    return res.status(403).json({ message: 'Sign up is currently disabled.' })
+  }
+
   const name = String(req.body.name || '').trim()
   const email = String(req.body.email || '').trim().toLowerCase()
   const password = String(req.body.password || '')

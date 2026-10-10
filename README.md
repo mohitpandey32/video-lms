@@ -101,6 +101,12 @@ VITE_API_URL=https://YOUR-BACKEND-DOMAIN
 
 Do not include a trailing slash or `/api`. Redeploy the frontend whenever `VITE_API_URL` changes.
 
+## Sign up availability
+
+Sign up is disabled by default: the frontend hides the sign-up tab and the backend rejects `POST /api/auth/signup` with HTTP 403. Existing users can still log in.
+
+To re-enable sign up, set `SIGNUP_ENABLED=true` in the backend environment and `VITE_SIGNUP_ENABLED=true` in the frontend build environment. Restart or redeploy the backend and rebuild or redeploy the frontend. The signup form and account creation logic are preserved.
+
 ## Data storage
 
 Runtime data is stored in MongoDB collections:

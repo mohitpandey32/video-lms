@@ -9,6 +9,8 @@ import {
   StickyNote, Trash2, UnlockKeyhole, VideoOff, Volume2, VolumeX, X,
 } from 'lucide-react'
 
+const signupEnabled = import.meta.env.VITE_SIGNUP_ENABLED === 'true'
+
 function formatTime(value) {
   if (!Number.isFinite(value)) return '0:00'
   const totalSeconds = Math.max(0, Math.floor(value))
@@ -799,7 +801,7 @@ function AuthScreen({ onAuthenticate }) {
           <span className="auth-icon"><GraduationCap /></span>
           <h2>{mode === 'login' ? 'Welcome back' : 'Create your account'}</h2>
           <p>{mode === 'login' ? 'Sign in to continue your course.' : 'New accounts are created as students.'}</p>
-          <div className="auth-tabs"><button className={mode === 'login' ? 'active' : ''} onClick={() => changeMode('login')}>Log in</button><button className={mode === 'signup' ? 'active' : ''} onClick={() => changeMode('signup')}>Sign up</button></div>
+          {signupEnabled && <div className="auth-tabs"><button className={mode === 'login' ? 'active' : ''} onClick={() => changeMode('login')}>Log in</button><button className={mode === 'signup' ? 'active' : ''} onClick={() => changeMode('signup')}>Sign up</button></div>}
           <form onSubmit={submit}>
             {mode === 'signup' && <label>Full name<span className="auth-input"><UserRound /><input value={form.name} onChange={update('name')} autoComplete="name" placeholder="Your name" /></span></label>}
             <label>Email address<span className="auth-input"><Mail /><input type="email" value={form.email} onChange={update('email')} autoComplete="email" placeholder="you@example.com" /></span></label>
