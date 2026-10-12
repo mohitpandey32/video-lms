@@ -60,6 +60,28 @@ export async function updateModule(req, res) {
   }
 }
 
+export async function createModule(req, res) {
+  const title = String(req.body.title || '').trim()
+  if (!title) return res.status(400).json({ message: 'Enter a module name.' })
+  if (title.length > 73) {
+    return res.status(400).json({ message: 'Module names must be 73 characters or fewer.' })
+  }
+
+  try {
+    const course = await getCourse()
+    const moduleTitle = `${String(course.modules.length + 1).padStart(2, '0')} · ${title}`
+    if (moduleTitle.length > 80) {
+      return res.status(400).json({ message: 'The course has too many modules to add another.' })
+    }
+    course.modules.push({ title: moduleTitle, lessons: [] })
+    await saveCourse(course)
+    res.status(201).json(await applyUserProgress(course, req.user.id))
+  } catch (error) {
+    console.error('Could not create module:', error)
+    res.status(500).json({ message: 'Could not create the module.' })
+  }
+}
+
 export async function updateLecture(req, res) {
   const moduleIndex = Number(req.params.moduleIndex)
   const lectureIndex = Number(req.params.lectureIndex)

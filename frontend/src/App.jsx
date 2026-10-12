@@ -713,6 +713,36 @@ function EditModuleModal({ module, onClose, onSave }) {
   )
 }
 
+function NewModuleModal({ onClose, onCreate }) {
+  const [title, setTitle] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const submit = async (event) => {
+    event.preventDefault()
+    try {
+      setSaving(true); setError('')
+      await onCreate(title)
+      onClose()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
+      <motion.form className="modal module-form" initial={{ scale: .96, y: 16 }} animate={{ scale: 1, y: 0 }} exit={{ scale: .96, y: 16 }} onSubmit={submit} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-heading"><div><span className="modal-icon"><Plus /></span><div><h2>Add a module</h2><p>Create an empty section in the course outline.</p></div></div><button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X /></button></div>
+        <label>Module name<input autoFocus maxLength="73" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Product discovery" /></label>
+        <div className="field-meta"><span>A sequence number will be added automatically.</span><span>{title.length}/73</span></div>
+        {error && <span className="form-error">{error}</span>}
+        <div className="modal-actions"><button type="button" className="text-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={saving}>{saving ? 'Adding module…' : 'Add module'}</button></div>
+      </motion.form>
+    </motion.div>
+  )
+}
+
 function EditLectureModal({ lecture, onClose, onSave }) {
   const [title, setTitle] = useState(lecture.title)
   const [error, setError] = useState('')
@@ -816,7 +846,7 @@ function AuthScreen({ onAuthenticate }) {
   )
 }
 
-function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditModule, onEditLecture, onEditResources, onDeleteLecture, onMoveLecture }) {
+function AdminDashboard({ data, user, onPreview, onLogout, onNewModule, onNewLecture, onEditModule, onEditLecture, onEditResources, onDeleteLecture, onMoveLecture }) {
   const [openMenu, setOpenMenu] = useState(null)
   const [draggedLecture, setDraggedLecture] = useState(null)
   const [dropTarget, setDropTarget] = useState(null)
@@ -907,7 +937,7 @@ function AdminDashboard({ data, user, onPreview, onLogout, onNewLecture, onEditM
         <div className="admin-account"><span className="avatar">{user.name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</span><div><b>{user.name}</b><span>Administrator</span></div><button onClick={onLogout} aria-label="Log out" title="Log out"><LogOut /></button></div>
       </aside>
       <main className="admin-main">
-        <header className="admin-header"><div><span className="overline">COURSE CONTENT</span><h1>{data.course.title}</h1><p>Manage the lesson sequence, video sources, notes, and assignments.</p></div><button className="primary-button admin-add" onClick={() => onNewLecture(0)}><Plus /> New lecture</button></header>
+        <header className="admin-header"><div><span className="overline">COURSE CONTENT</span><h1>{data.course.title}</h1><p>Manage the lesson sequence, video sources, notes, and assignments.</p></div><div className="admin-header-actions"><button className="outline-button admin-add" onClick={onNewModule} title="Add module"><Plus /> New module</button><button className="primary-button admin-add" onClick={() => onNewLecture(Math.max(0, data.modules.length - 1))} title="Add lecture"><Plus /> New lecture</button></div></header>
         <dl className="admin-metrics"><div><dt>Modules</dt><dd>{String(data.modules.length).padStart(2, '0')}</dd></div><div><dt>Lectures</dt><dd>{String(lessonCount).padStart(2, '0')}</dd></div><div><dt>Video ready</dt><dd>{String(videoCount).padStart(2, '0')}</dd></div><div><dt>With resources</dt><dd>{String(resourceCount).padStart(2, '0')}</dd></div></dl>
         <section className="admin-content">
           <div className="admin-section-heading"><div><h2>Course outline</h2><p>Drag a lecture by its handle to change its position or module.</p></div><span>{reordering ? 'Saving order…' : `${lessonCount} total`}</span></div>
@@ -965,6 +995,7 @@ export default function App() {
   const [railOpen, setRailOpen] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [newLectureModuleIndex, setNewLectureModuleIndex] = useState(null)
+  const [newModuleOpen, setNewModuleOpen] = useState(false)
   const [editingModule, setEditingModule] = useState(null)
   const [editingLecture, setEditingLecture] = useState(null)
   const [editingResources, setEditingResources] = useState(null)
@@ -1038,6 +1069,11 @@ export default function App() {
     setData(updated)
   }
 
+  const createModule = async (title) => {
+    const updated = await api.createModule(title)
+    setData(updated)
+  }
+
   const updateLectureName = async (moduleIndex, lectureIndex, title) => {
     const updated = await api.updateLectureName(moduleIndex, lectureIndex, title)
     setData(updated)
@@ -1101,7 +1137,8 @@ export default function App() {
   if (canEdit && !adminPreview) {
     return (
       <>
-        <AdminDashboard data={data} user={user} onPreview={() => setAdminPreview(true)} onLogout={logout} onNewLecture={(moduleIndex) => setNewLectureModuleIndex(moduleIndex)} onEditModule={(index, title) => setEditingModule({ index, title })} onEditLecture={(moduleIndex, lectureIndex, title) => setEditingLecture({ moduleIndex, lectureIndex, title })} onEditResources={(moduleIndex, lectureIndex, lecture) => setEditingResources({ moduleIndex, lectureIndex, ...lecture })} onDeleteLecture={(moduleIndex, lectureIndex, lecture) => setDeletingLecture({ moduleIndex, lectureIndex, title: lecture.title })} onMoveLecture={moveLecture} />
+        <AdminDashboard data={data} user={user} onPreview={() => setAdminPreview(true)} onLogout={logout} onNewModule={() => setNewModuleOpen(true)} onNewLecture={(moduleIndex) => setNewLectureModuleIndex(moduleIndex)} onEditModule={(index, title) => setEditingModule({ index, title })} onEditLecture={(moduleIndex, lectureIndex, title) => setEditingLecture({ moduleIndex, lectureIndex, title })} onEditResources={(moduleIndex, lectureIndex, lecture) => setEditingResources({ moduleIndex, lectureIndex, ...lecture })} onDeleteLecture={(moduleIndex, lectureIndex, lecture) => setDeletingLecture({ moduleIndex, lectureIndex, title: lecture.title })} onMoveLecture={moveLecture} />
+        <AnimatePresence>{newModuleOpen && <NewModuleModal onClose={() => setNewModuleOpen(false)} onCreate={createModule} />}</AnimatePresence>
         <AnimatePresence>{newLectureModuleIndex !== null && <NewLectureModal modules={data.modules} initialModuleIndex={newLectureModuleIndex} onClose={() => setNewLectureModuleIndex(null)} onCreate={createLecture} />}</AnimatePresence>
         <AnimatePresence>{editingModule && <EditModuleModal module={editingModule} onClose={() => setEditingModule(null)} onSave={updateModule} />}</AnimatePresence>
         <AnimatePresence>{editingLecture && <EditLectureModal lecture={editingLecture} onClose={() => setEditingLecture(null)} onSave={updateLectureName} />}</AnimatePresence>

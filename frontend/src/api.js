@@ -57,6 +57,10 @@ export const api = {
     method: 'PUT',
     body: json({ title }),
   }),
+  createModule: (title) => request('/api/modules', {
+    method: 'POST',
+    body: json({ title }),
+  }),
   updateLectureName: (moduleIndex, lectureIndex, title) => request(
     `/api/modules/${moduleIndex}/lectures/${lectureIndex}`,
     { method: 'PUT', body: json({ title }) },
