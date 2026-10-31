@@ -713,7 +713,7 @@ function EditModuleModal({ module, onClose, onSave }) {
   )
 }
 
-function NewModuleModal({ onClose, onCreate }) {
+function NewModuleModal({ afterModule, onClose, onCreate }) {
   const [title, setTitle] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -721,7 +721,7 @@ function NewModuleModal({ onClose, onCreate }) {
     event.preventDefault()
     try {
       setSaving(true); setError('')
-      await onCreate(title)
+      await onCreate(title, afterModule?.index ?? -1)
       onClose()
     } catch (err) {
       setError(err.message)
@@ -733,9 +733,9 @@ function NewModuleModal({ onClose, onCreate }) {
   return (
     <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={onClose}>
       <motion.form className="modal module-form" initial={{ scale: .96, y: 16 }} animate={{ scale: 1, y: 0 }} exit={{ scale: .96, y: 16 }} onSubmit={submit} onMouseDown={(event) => event.stopPropagation()}>
-        <div className="modal-heading"><div><span className="modal-icon"><Plus /></span><div><h2>Add a module</h2><p>Create an empty section in the course outline.</p></div></div><button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X /></button></div>
+        <div className="modal-heading"><div><span className="modal-icon"><Plus /></span><div><h2>Add a module</h2><p>{afterModule ? `Insert an empty section below Module ${String(afterModule.index + 1).padStart(2, '0')}.` : 'Create an empty section in the course outline.'}</p></div></div><button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X /></button></div>
         <label>Module name<input autoFocus maxLength="73" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Product discovery" /></label>
-        <div className="field-meta"><span>A sequence number will be added automatically.</span><span>{title.length}/73</span></div>
+        <div className="field-meta"><span>Module numbers update to match the course order.</span><span>{title.length}/73</span></div>
         {error && <span className="form-error">{error}</span>}
         <div className="modal-actions"><button type="button" className="text-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={saving}>{saving ? 'Adding module…' : 'Add module'}</button></div>
       </motion.form>
@@ -946,7 +946,7 @@ function AdminDashboard({ data, user, onPreview, onLogout, onNewModule, onNewLec
             <motion.section className="admin-module" key={moduleIndex} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: moduleIndex * .05 }}>
               <header>
                 <div className="admin-module-title"><span>Module {String(moduleIndex + 1).padStart(2, '0')}</span><div><h3>{module.title.replace(/^\d+\s*·\s*/, '')}</h3><p>{module.lessons.length} {module.lessons.length === 1 ? 'lecture' : 'lectures'}</p></div></div>
-                <div className="admin-module-actions"><button onClick={() => onEditModule(moduleIndex, module.title)}><PencilLine /> Rename</button><button className="module-add" onClick={() => onNewLecture(moduleIndex)}><Plus /> Add lecture</button></div>
+                <div className="admin-module-actions"><button onClick={() => onEditModule(moduleIndex, module.title)}><PencilLine /> Rename</button><button className="module-add" onClick={() => onNewModule(moduleIndex)} title={`Add module below ${module.title.replace(/^\d+\s*·\s*/, '')}`}><Plus /> Add module</button><button className="module-add" onClick={() => onNewLecture(moduleIndex)}><Plus /> Add lecture</button></div>
               </header>
               <div className="admin-lessons">
                 {module.lessons.map((lesson, lectureIndex) => {
@@ -995,7 +995,7 @@ export default function App() {
   const [railOpen, setRailOpen] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [newLectureModuleIndex, setNewLectureModuleIndex] = useState(null)
-  const [newModuleOpen, setNewModuleOpen] = useState(false)
+  const [newModuleAfterIndex, setNewModuleAfterIndex] = useState(null)
   const [editingModule, setEditingModule] = useState(null)
   const [editingLecture, setEditingLecture] = useState(null)
   const [editingResources, setEditingResources] = useState(null)
@@ -1069,8 +1069,8 @@ export default function App() {
     setData(updated)
   }
 
-  const createModule = async (title) => {
-    const updated = await api.createModule(title)
+  const createModule = async (title, afterIndex) => {
+    const updated = await api.createModule(title, afterIndex)
     setData(updated)
   }
 
@@ -1137,8 +1137,8 @@ export default function App() {
   if (canEdit && !adminPreview) {
     return (
       <>
-        <AdminDashboard data={data} user={user} onPreview={() => setAdminPreview(true)} onLogout={logout} onNewModule={() => setNewModuleOpen(true)} onNewLecture={(moduleIndex) => setNewLectureModuleIndex(moduleIndex)} onEditModule={(index, title) => setEditingModule({ index, title })} onEditLecture={(moduleIndex, lectureIndex, title) => setEditingLecture({ moduleIndex, lectureIndex, title })} onEditResources={(moduleIndex, lectureIndex, lecture) => setEditingResources({ moduleIndex, lectureIndex, ...lecture })} onDeleteLecture={(moduleIndex, lectureIndex, lecture) => setDeletingLecture({ moduleIndex, lectureIndex, title: lecture.title })} onMoveLecture={moveLecture} />
-        <AnimatePresence>{newModuleOpen && <NewModuleModal onClose={() => setNewModuleOpen(false)} onCreate={createModule} />}</AnimatePresence>
+        <AdminDashboard data={data} user={user} onPreview={() => setAdminPreview(true)} onLogout={logout} onNewModule={(afterIndex = data.modules.length - 1) => setNewModuleAfterIndex(afterIndex)} onNewLecture={(moduleIndex) => setNewLectureModuleIndex(moduleIndex)} onEditModule={(index, title) => setEditingModule({ index, title })} onEditLecture={(moduleIndex, lectureIndex, title) => setEditingLecture({ moduleIndex, lectureIndex, title })} onEditResources={(moduleIndex, lectureIndex, lecture) => setEditingResources({ moduleIndex, lectureIndex, ...lecture })} onDeleteLecture={(moduleIndex, lectureIndex, lecture) => setDeletingLecture({ moduleIndex, lectureIndex, title: lecture.title })} onMoveLecture={moveLecture} />
+        <AnimatePresence>{newModuleAfterIndex !== null && <NewModuleModal afterModule={newModuleAfterIndex >= 0 ? { index: newModuleAfterIndex } : null} onClose={() => setNewModuleAfterIndex(null)} onCreate={createModule} />}</AnimatePresence>
         <AnimatePresence>{newLectureModuleIndex !== null && <NewLectureModal modules={data.modules} initialModuleIndex={newLectureModuleIndex} onClose={() => setNewLectureModuleIndex(null)} onCreate={createLecture} />}</AnimatePresence>
         <AnimatePresence>{editingModule && <EditModuleModal module={editingModule} onClose={() => setEditingModule(null)} onSave={updateModule} />}</AnimatePresence>
         <AnimatePresence>{editingLecture && <EditLectureModal lecture={editingLecture} onClose={() => setEditingLecture(null)} onSave={updateLectureName} />}</AnimatePresence>

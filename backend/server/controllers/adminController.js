@@ -62,6 +62,7 @@ export async function updateModule(req, res) {
 
 export async function createModule(req, res) {
   const title = String(req.body.title || '').trim()
+  const afterIndex = req.body.afterIndex === undefined ? null : Number(req.body.afterIndex)
   if (!title) return res.status(400).json({ message: 'Enter a module name.' })
   if (title.length > 73) {
     return res.status(400).json({ message: 'Module names must be 73 characters or fewer.' })
@@ -69,11 +70,19 @@ export async function createModule(req, res) {
 
   try {
     const course = await getCourse()
-    const moduleTitle = `${String(course.modules.length + 1).padStart(2, '0')} · ${title}`
+    const insertionIndex = afterIndex === null ? course.modules.length : afterIndex + 1
+    if (!Number.isInteger(insertionIndex) || insertionIndex < 0 || insertionIndex > course.modules.length) {
+      return res.status(400).json({ message: 'Choose a valid position for the new module.' })
+    }
+    const moduleTitle = `${String(insertionIndex + 1).padStart(2, '0')} · ${title}`
     if (moduleTitle.length > 80) {
       return res.status(400).json({ message: 'The course has too many modules to add another.' })
     }
-    course.modules.push({ title: moduleTitle, lessons: [] })
+    course.modules.splice(insertionIndex, 0, { title: moduleTitle, lessons: [] })
+    course.modules.forEach((module, moduleIndex) => {
+      const moduleName = module.title.replace(/^\d+\s*·\s*/, '')
+      module.title = `${String(moduleIndex + 1).padStart(2, '0')} · ${moduleName}`
+    })
     await saveCourse(course)
     res.status(201).json(await applyUserProgress(course, req.user.id))
   } catch (error) {
